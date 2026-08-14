@@ -1,0 +1,25 @@
+# IPA / binary artifacts
+*.ipa
+*.dmg
+_work/artifacts/UnityFramework.*
+_work/artifacts/*.backup
+_work/artifacts/*.patched
+_work/ghidra_proj/
+_work/pristine-baseline/
+_work/static-wide/__pycache__/
+__pycache__/
+*.pyc
+
+# PlayCover / containers
+_work/install-backups/
+_work/playcover-latest/
+
+# Build
+build/
+DerivedData/
+*.xcuserstate
+.DS_Store
+
+# Temp verify
+/tmp/zzz_verify_*
+dist/PlayTools-simplified-citygate.framework/
