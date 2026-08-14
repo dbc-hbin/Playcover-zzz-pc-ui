@@ -23,3 +23,7 @@ DerivedData/
 # Temp verify
 /tmp/zzz_verify_*
 dist/PlayTools-simplified-citygate.framework/
+
+# Local workspace / Ghidra project (contains username/hostname) — never track
+.ai-bridge/
+ZZZGlobal4/

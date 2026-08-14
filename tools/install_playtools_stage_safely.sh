@@ -9,7 +9,7 @@ fi
 stage=${1:A}
 internal=/Applications/PlayCover.app/Contents/Frameworks/PlayTools.framework
 user_framework=$HOME/Library/Frameworks/PlayTools.framework
-backup_root=/Users/hanbinnoh/Documents/ZZZ-ipa-keyboard/_work/install-backups
+backup_root=${0:A:h}/../_work/install-backups
 stamp=$(date +%Y%m%d-%H%M%S)
 backup=$backup_root/playtools-$stamp
 
