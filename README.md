@@ -58,7 +58,8 @@ Fixes 3.1.0 camera + F1–F4 via profile-gated virtual Mouse. Installed only if 
 
 ```bash
 zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
-# checks: not running, MACCATALYST, codesign --verify, hash match; backs up to _work/install-backups/
+# installs only ~/Library/Frameworks, preserves PlayCover's Developer ID signature,
+# blocks PlayCover's startup overwrite, verifies hashes, and backs up to _work/install-backups/
 ```
 
 Then in PlayCover: **Input Compatibility → Unity Native Mouse (Experimental)** → restart.
@@ -132,7 +133,8 @@ python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
 
 ```bash
 zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
-# 검증: 실행 중 프로세스 없음, MACCATALYST, codesign --verify, hash 일치; _work/install-backups/에 백업
+# ~/Library/Frameworks에만 설치하고 PlayCover Developer ID 서명을 보존하며,
+# 시작 시 덮어쓰기를 차단하고 해시를 검증한 뒤 _work/install-backups/에 백업
 ```
 
 이후 PlayCover에서 **Input Compatibility → Unity Native Mouse (Experimental)** 활성화 → 재시작.

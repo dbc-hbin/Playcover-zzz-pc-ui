@@ -7,7 +7,8 @@ if (( $# != 1 )); then
 fi
 
 stage=${1:A}
-internal=/Applications/PlayCover.app/Contents/Frameworks/PlayTools.framework
+playcover_app=/Applications/PlayCover.app
+playcover_exec=$playcover_app/Contents/MacOS/PlayCover
 user_framework=$HOME/Library/Frameworks/PlayTools.framework
 backup_root=${0:A:h}/../_work/install-backups
 stamp=$(date +%Y%m%d-%H%M%S)
@@ -31,26 +32,24 @@ codesign --verify --deep --strict "$stage"
   print -u2 'refusing install: stage is not Mac Catalyst'
   exit 66
 }
+codesign --verify --deep --strict "$playcover_app"
+playcover_hash_before=$(shasum -a 256 "$playcover_exec" | awk '{print $1}')
 
 mkdir -p "$backup"
-ditto "$internal" "$backup/internal.framework"
+chflags -R nouchg "$user_framework"
 ditto "$user_framework" "$backup/user.framework"
 
-internal_tmp=${internal}.codex-new-$stamp
 user_tmp=${user_framework}.codex-new-$stamp
-internal_old=${internal}.codex-old-$stamp
 user_old=${user_framework}.codex-old-$stamp
 
 restore() {
   local status=$?
   if (( status != 0 )); then
-    if [[ -d $internal_old ]]; then
-      [[ -e $internal ]] && mv "$internal" "${internal}.codex-failed-$stamp"
-      mv "$internal_old" "$internal"
-    fi
     if [[ -d $user_old ]]; then
+      [[ -e $user_framework ]] && chflags -R nouchg "$user_framework"
       [[ -e $user_framework ]] && mv "$user_framework" "${user_framework}.codex-failed-$stamp"
       mv "$user_old" "$user_framework"
+      chflags -R uchg "$user_framework"
     fi
     print -u2 "install failed; rollback attempted (status=$status)"
   fi
@@ -58,29 +57,28 @@ restore() {
 }
 trap restore EXIT
 
-ditto "$stage" "$internal_tmp"
 ditto "$stage" "$user_tmp"
-codesign --verify --deep --strict "$internal_tmp"
 codesign --verify --deep --strict "$user_tmp"
 
-mv "$internal" "$internal_old"
-mv "$internal_tmp" "$internal"
 mv "$user_framework" "$user_old"
 mv "$user_tmp" "$user_framework"
-
-codesign --force --deep --sign - --timestamp=none /Applications/PlayCover.app
-codesign --verify --deep --strict /Applications/PlayCover.app
+chflags -R uchg "$user_framework"
 
 stage_hash=$(shasum -a 256 "$stage/PlayTools" | awk '{print $1}')
-internal_hash=$(shasum -a 256 "$internal/PlayTools" | awk '{print $1}')
 user_hash=$(shasum -a 256 "$user_framework/PlayTools" | awk '{print $1}')
-[[ $stage_hash == $internal_hash && $stage_hash == $user_hash ]] || {
+[[ $stage_hash == $user_hash ]] || {
   print -u2 'installed framework hash mismatch'
   exit 67
 }
+playcover_hash_after=$(shasum -a 256 "$playcover_exec" | awk '{print $1}')
+[[ $playcover_hash_before == $playcover_hash_after ]] || {
+  print -u2 'PlayCover changed during installation'
+  exit 68
+}
+codesign --verify --deep --strict "$playcover_app"
 
 trap - EXIT
 print "installed PlayTools SHA256=$stage_hash"
 print "backup=$backup"
-print "old internal=$internal_old"
 print "old user=$user_old"
+print "PlayCover preserved SHA256=$playcover_hash_after"
