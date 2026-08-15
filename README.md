@@ -1,4 +1,4 @@
-# ZZZ IPA Keyboard — Global 3.1.0 PC UI Patch / ZZZ 글로벌 3.1.0 PC UI 패치
+# Playcover ZZZ PC UI — Global 3.1.0 Patch Set / ZZZ 글로벌 3.1.0 통합 패치 세트
 
 > **Authority / 권위 문서**: `GOAL_ZZZ_UI_LAYOUT.md` + `_work/static-wide/PC_UI_MOUSE_BRIDGE_CONSOLIDATED_20260813_V2.md`  
 > Validated on live device: PC login/title UI + world entry (`CloseLogin → SceneSwitch complete`), no `MouseInputEnhancement` NRE.
@@ -12,10 +12,12 @@
 | Path | Description |
 |---|---|
 | `tools/patch_zzz_global_ipa.py` | **Minimal working patch** — applies exactly 2 verified UnityFramework patches to a user-owned IPA and re-signs it |
-| `tools/install_playtools_stage_safely.sh` | Safe installer for the patched PlayTools framework (with rollback) |
-| `dist/PlayTools-simplified-citygate.framework` | Final patched PlayTools framework (also as `dist/*.zip` for Releases) |
+| `src/PlayTools` | Patched PlayTools source for Option camera mode, F1–F4 forwarding, and corrected Y-axis input |
+| `dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip` | Verified patched PlayTools framework |
+| `patches/playcover-3.1.0-combined.patch` | Reproducible PlayCover 3.1.0 source patch for the combined app |
+| `dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip` | Combined PlayCover + patched PlayTools build |
 
-Only these are committed. Patched IPAs (`*.ipa`, `*.dmg`) are never committed.
+Patched IPAs (`*.ipa`, `*.dmg`) are never committed.
 
 ### The 2-site patch (and only this)
 
@@ -50,14 +52,21 @@ python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa --identity "Apple Dev
 python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
 ```
 
-The script: `unzip` → verify bytes at both offsets → patch → `chmod 755` → remove `SC_Info`/`_CodeSignature` → `codesign --force --sign <id> --timestamp=none` (framework → app) → `codesign --verify --deep --strict` → `zip` repack → verify inside IPA.
+The script: path-safe, metadata-preserving `ditto` extract → verify bytes at
+both offsets → patch → enforce executable mode `0755` and preserve entitlements → remove `SC_Info`
+while retaining untouched nested signatures → `codesign --force --sign <id>
+--timestamp=none` (framework → app) → `codesign --verify --deep --strict` →
+atomic `ditto` repack → verify CRC, patch bytes, executable mode, symlinks, and
+`SC_Info` removal inside the IPA. It refuses to overwrite the source IPA.
 
 ### Usage — PlayTools (optional, macOS PlayCover)
 
 Fixes 3.1.0 camera + F1–F4 via profile-gated virtual Mouse. Installed only if you use PlayCover on macOS.
 
 ```bash
-zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
+stage=$(mktemp -d)
+ditto -x -k dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip "$stage"
+zsh tools/install_playtools_stage_safely.sh "$stage/PlayTools-camera-yfix.framework"
 # installs only ~/Library/Frameworks, preserves PlayCover's Developer ID signature,
 # verifies hashes, and backs up to _work/install-backups/
 ```
@@ -90,7 +99,7 @@ is retargeted; the discarded city-gate game patch is not installed.
 
 Download from [Releases](../../releases):
 
-- `PlayTools-simplified-citygate.framework.zip`
+- `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`
 - `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
 - `patch_zzz_global_ipa.py` (or clone this repo)
 
@@ -110,10 +119,12 @@ Download from [Releases](../../releases):
 | 경로 | 설명 |
 |---|---|
 | `tools/patch_zzz_global_ipa.py` | **작동하는 최소 패치** — 사용자가 보유한 IPA에 검증된 2곳만 패치하고 자동 재서명 |
-| `tools/install_playtools_stage_safely.sh` | 패치된 PlayTools 프레임워크 안전 설치 스크립트 (롤백 지원) |
-| `dist/PlayTools-simplified-citygate.framework` | 최종 패치된 PlayTools 프레임워크 (Releases용 `dist/*.zip` 포함) |
+| `src/PlayTools` | Option 카메라 모드, F1–F4 전달, Y축 보정을 포함한 PlayTools 소스 |
+| `dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip` | 검증된 패치 PlayTools 프레임워크 |
+| `patches/playcover-3.1.0-combined.patch` | 통합 앱을 재현하는 PlayCover 3.1.0 소스 패치 |
+| `dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip` | PlayCover + 패치된 PlayTools 통합 빌드 |
 
-이 외에는 커밋하지 않음. 패치된 IPA(`*.ipa`, `*.dmg`)는 절대 커밋하지 않음.
+패치된 IPA(`*.ipa`, `*.dmg`)는 절대 커밋하지 않음.
 
 ### 2곳 패치 (이것만)
 
@@ -148,14 +159,21 @@ python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa --identity "Apple Dev
 python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
 ```
 
-동작: `unzip` → 두 오프셋 바이트 검증 → 패치 → `chmod 755` → `SC_Info`/`_CodeSignature` 제거 → `codesign --force --sign <id>` (framework → app 순) → `codesign --verify --deep --strict` → `zip` 재패키징 → IPA 내부 바이트 재검증.
+동작: 경로를 검증하고 메타데이터를 보존하는 `ditto` 압축 해제 → 두 오프셋
+바이트 검증 → 패치 → 실행 권한 `0755` 강제 및 entitlement 보존 → 수정하지 않은 중첩 서명은 유지하면서
+`SC_Info`만 제거 → `codesign --force --sign <id>` (framework → app 순) →
+`codesign --verify --deep --strict` → 원자적 `ditto` 재패키징 → IPA 내부 CRC,
+패치 바이트, 실행 권한, 심볼릭 링크, `SC_Info` 제거 재검증. 원본 IPA와 같은
+출력 경로는 거부한다.
 
 ### 사용법 — PlayTools (선택, macOS PlayCover)
 
 3.1.0 카메라 + F1–F4를 profile-gated 가상 Mouse로 복구. PlayCover를 쓰는 경우에만 설치.
 
 ```bash
-zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
+stage=$(mktemp -d)
+ditto -x -k dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip "$stage"
+zsh tools/install_playtools_stage_safely.sh "$stage/PlayTools-camera-yfix.framework"
 # ~/Library/Frameworks에만 설치하고 PlayCover Developer ID 서명을 보존하며,
 # 해시를 검증한 뒤 _work/install-backups/에 백업
 ```
@@ -187,7 +205,7 @@ Y-fix 바이너리를 layout-2 + MouseInputEnhancement null-safe UnityFramework�
 
 [Releases](../../releases)에서 다운로드:
 
-- `PlayTools-simplified-citygate.framework.zip`
+- `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`
 - `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
 - `patch_zzz_global_ipa.py` (또는 이 저장소 clone)
 
@@ -200,4 +218,6 @@ Y-fix 바이너리를 layout-2 + MouseInputEnhancement null-safe UnityFramework�
 
 ### License
 
-AGPL-3.0 — PlayTools is AGPL-3.0. This repo distributes PlayTools source via `playcover-latest` reference and the patched framework as a build artifact. Patched IPAs are not distributed.
+AGPL-3.0 — PlayTools is AGPL-3.0. This repo distributes its patched source under
+`src/PlayTools` and the patched framework as a build artifact. Patched IPAs are
+not distributed.
