@@ -1,0 +1,209 @@
+diff --git a/PlayCover.xcodeproj/project.pbxproj b/PlayCover.xcodeproj/project.pbxproj
+index b72868d..b27c9b1 100644
+--- a/PlayCover.xcodeproj/project.pbxproj
++++ b/PlayCover.xcodeproj/project.pbxproj
+@@ -573,7 +573,7 @@
+ 			);
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 			shellPath = /bin/zsh;
+-			shellScript = "set -euo pipefail\n\nif [ -x /usr/local/bin/carthage ]; then\n    carthage=/usr/local/bin/carthage\nelif [ -x /opt/homebrew/bin/carthage ]; then\n    carthage=/opt/homebrew/bin/carthage\nelif [ -x /opt/local/bin/carthage ]; then\n    carthage=/opt/local/bin/carthage\nelse\n    echo \"Cannot find carthage\"\n    exit 1\nfi\n\necho \"Converting to maccatalyst\"\nvtool \\\n    -set-build-version maccatalyst 11.0 14.0 \\\n    -replace -output \\\n    \"${SCRIPT_INPUT_FILE_0}/PlayTools\" \\\n    \"${SCRIPT_INPUT_FILE_0}/PlayTools\"\n\necho \"Codesigning PlayTools\"\n\n$carthage copy-frameworks\n\necho cp -rf ${SRCROOT}/Carthage/Build/PlayTools.xcframework/ios-arm64/PlayTools.framework/PlugIns/AKInterface.bundle ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework/PlugIns/AKInterface.bundle\n\nrm -rf ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework/PlugIns/AKInterface.bundle\ncp -rf ${SRCROOT}/Carthage/Build/PlayTools.xcframework/ios-arm64/PlayTools.framework/PlugIns/AKInterface.bundle ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework/PlugIns/AKInterface.bundle\n";
++			shellScript = "set -euo pipefail\n\nsource=${SCRIPT_INPUT_FILE_0}\ntarget=${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework\n\nif [[ -e $target ]]; then\n    /usr/bin/find $target -depth -delete\nfi\n/usr/bin/ditto $source $target\n/usr/bin/codesign --force --sign - --timestamp=none $target/PlugIns/AKInterface.bundle\n/usr/bin/codesign --force --sign - --timestamp=none $target\n";
+ 		};
+ 		AAC28F222899A05B005057FB /* Codesign sparkle */ = {
+ 			isa = PBXShellScriptBuildPhase;
+@@ -592,7 +592,7 @@
+ 			);
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 			shellPath = /bin/sh;
+-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nset -euo pipefail\n\nIDENTITY=${EXPANDED_CODE_SIGN_IDENTITY_NAME};\n# Apple Development: XIN LI (33X85HBRP6)\necho Signing identity $IDENTITY;\n\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework/PlugIns/AKInterface.bundle;\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework;\n\n# sign sparkle\nLOCATION=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\";\necho Sparkle Signing location $LOCATION;\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/Autoupdate\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/Updater.app\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/XPCServices/Downloader.xpc\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/XPCServices/Installer.xpc\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION\";\n";
++			shellScript = "# Local patched build uses an ad-hoc signature.\nset -euo pipefail\n\nIDENTITY=-;\necho Signing identity $IDENTITY;\n\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework/PlugIns/AKInterface.bundle;\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/PlayTools.framework;\n\n# sign sparkle\nLOCATION=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\";\necho Sparkle Signing location $LOCATION;\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/Autoupdate\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/Updater.app\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/XPCServices/Downloader.xpc\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION/Versions/B/XPCServices/Installer.xpc\";\ncodesign -f -o runtime -s \"$IDENTITY\" \"$LOCATION\";\n";
+ 		};
+ 		AAE8809C287ACA4900FBB23C /* Carthage Bootstrap */ = {
+ 			isa = PBXShellScriptBuildPhase;
+@@ -987,8 +987,8 @@
+ 			isa = XCRemoteSwiftPackageReference;
+ 			repositoryURL = "https://github.com/lorenzofiamingo/swiftui-cached-async-image";
+ 			requirement = {
+-				kind = upToNextMajorVersion;
+-				minimumVersion = 2.0.0;
++				kind = revision;
++				revision = eeb1565d780d1b75d045e21b5ca2a1e3650b0fc2;
+ 			};
+ 		};
+ 		AA818CB3287ABEC3000BEE9D /* XCRemoteSwiftPackageReference "Yams" */ = {
+diff --git a/PlayCover/Info.plist b/PlayCover/Info.plist
+index 1ab5208..b11a328 100644
+--- a/PlayCover/Info.plist
++++ b/PlayCover/Info.plist
+@@ -5,7 +5,7 @@
+ 	<key>CFBundleDevelopmentRegion</key>
+ 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+ 	<key>CFBundleDisplayName</key>
+-	<string>PlayCover</string>
++	<string>Playcover ZZZ PC UI</string>
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>
+@@ -52,7 +52,7 @@
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+-	<string>$(PRODUCT_NAME)</string>
++	<string>Playcover ZZZ PC UI</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+ 	<key>CFBundleShortVersionString</key>
+diff --git a/PlayCover/Model/PlayApp.swift b/PlayCover/Model/PlayApp.swift
+index c4b763c..70cf054 100644
+--- a/PlayCover/Model/PlayApp.swift
++++ b/PlayCover/Model/PlayApp.swift
+@@ -21,8 +21,11 @@ class PlayApp: BaseApp {
+     override init(appUrl: URL) {
+         super.init(appUrl: appUrl)
+ 
++        // PlayCover 3.1.0 used a directory of symlinks as the launch target.
++        // On newer LaunchServices that bundle can have a null identity and
++        // produces the misleading "no permission to open (null)" alert.
++        // Keep only the canonical managed app URL as the launch target.
+         removeAlias()
+-        createAlias()
+ 
+         loadDiscordIPC()
+     }
+@@ -64,7 +67,7 @@ class PlayApp: BaseApp {
+             }
+ 
+             if try !PlayTools.isInstalled() {
+-                Log.shared.error("PlayTools are not installed! Please move PlayCover.app into Applications!")
++                Log.shared.error("PlayTools are not installed! Please move Playcover ZZZ PC UI.app into Applications!")
+             } else if try !Macho.isMachoValidArch(executable) {
+                 Log.shared.error("The app threw an error during conversion.")
+             } else {
+@@ -82,12 +85,22 @@ class PlayApp: BaseApp {
+ 
+     func runAppExec() {
+         let config = NSWorkspace.OpenConfiguration()
++        let canonicalURL = url.standardizedFileURL
++
++        guard FileManager.default.fileExists(atPath: canonicalURL.path),
++              FileManager.default.isExecutableFile(atPath: executable.path) else {
++            Log.shared.error("Cannot launch missing or non-executable app at \(canonicalURL.path)")
++            return
++        }
+ 
+         NSWorkspace.shared.openApplication(
+-            at: aliasURL,
++            at: canonicalURL,
+             configuration: config,
+             completionHandler: { runningApp, error in
+-                guard error == nil else { return }
++                if let error = error {
++                    Log.shared.error("Failed to launch \(canonicalURL.path): \(error.localizedDescription)")
++                    return
++                }
+                 // Run a thread loop in the background to handle background tasks
+                 Task(priority: .background) {
+                     if let runningApp = runningApp {
+diff --git a/PlayCover/PlayCoverRelease.entitlements b/PlayCover/PlayCoverRelease.entitlements
+index 0c67376..67f502f 100644
+--- a/PlayCover/PlayCoverRelease.entitlements
++++ b/PlayCover/PlayCoverRelease.entitlements
+@@ -1,5 +1,9 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+-<dict/>
++<dict>
++	<!-- The local combined build embeds ad-hoc signed PlayTools and Sparkle. -->
++	<key>com.apple.security.cs.disable-library-validation</key>
++	<true/>
++</dict>
+ </plist>
+diff --git a/PlayCover/Utils/AppIntegrity.swift b/PlayCover/Utils/AppIntegrity.swift
+index 3da702f..8e047db 100644
+--- a/PlayCover/Utils/AppIntegrity.swift
++++ b/PlayCover/Utils/AppIntegrity.swift
+@@ -31,7 +31,7 @@ class AppIntegrity: ObservableObject {
+         Bundle.main.resourceURL?.deletingLastPathComponent().deletingLastPathComponent()
+     }
+ 
+-    private static var expectedUrl = URL(fileURLWithPath: "/Applications/PlayCover.app")
++    private static var expectedUrl = URL(fileURLWithPath: "/Applications/Playcover ZZZ PC UI.app")
+ 
+     private static var insideAppsFolder: Bool {
+         if let url = appUrl {
+diff --git a/PlayCover/Utils/KeyCover.swift b/PlayCover/Utils/KeyCover.swift
+index af07be4..cb1cdfa 100644
+--- a/PlayCover/Utils/KeyCover.swift
++++ b/PlayCover/Utils/KeyCover.swift
+@@ -26,12 +26,14 @@ struct KeyCover {
+         return playChainDir
+     }
+ 
+-    // This is only exposed at runtime
+-    var keyCoverPlainTextKey: String? = KeyCoverPreferences.shared.keyCoverEnabled == .selfGeneratedPassword
+-    ? KeyCoverPassword.shared.getKeyCoverPassword() : nil
++    // This local ad-hoc build cannot satisfy the Developer ID ACL of the
++    // original PlayCover master-key item. Querying it blocks startup behind a
++    // system keychain prompt. The current ZZZ PlayChain database is already
++    // plaintext, so leave it untouched and disable KeyCover for this build.
++    var keyCoverPlainTextKey: String? = nil
+ 
+     func isKeyCoverEnabled() -> Bool {
+-        return KeyCoverPreferences.shared.keyCoverEnabled != .disabled
++        return false
+     }
+ 
+     func listKeychains() -> [KeyCoverKey] {
+diff --git a/PlayCover/Utils/PlayTools.swift b/PlayCover/Utils/PlayTools.swift
+index dd3745f..87875d4 100644
+--- a/PlayCover/Utils/PlayTools.swift
++++ b/PlayCover/Utils/PlayTools.swift
+@@ -92,12 +92,18 @@ class PlayTools {
+     }
+ 
+     static func installPluginInIPA(_ payload: URL) throws {
++        let localizationRoot = bundledPlayToolsFramework
++            .appendingPathComponent("Versions")
++            .appendingPathComponent("Current")
++            .appendingPathComponent("Resources")
++            .resolvingSymlinksInPath()
+         let allFiles = try FileManager.default.contentsOfDirectory(
+-            at: bundledPlayToolsFramework, includingPropertiesForKeys: [])
++            at: localizationRoot, includingPropertiesForKeys: [])
+         for localizationDirectory in allFiles where localizationDirectory.pathExtension == "lproj" {
+             _ = try copyAsset(target: payload,
+                               directoryName: localizationDirectory.lastPathComponent,
+-                              component: "Playtools", pathExtension: "strings")
++                              component: "Playtools", pathExtension: "strings",
++                              sourceRoot: localizationRoot)
+         }
+ 
+         let bundleTarget = try copyAsset(target: payload, directoryName: "PlugIns",
+@@ -107,7 +113,8 @@ class PlayTools {
+     }
+ 
+     static func copyAsset(target: URL, directoryName: String,
+-                          component: String, pathExtension: String) throws -> URL {
++                          component: String, pathExtension: String,
++                          sourceRoot: URL = bundledPlayToolsFramework) throws -> URL {
+         let directory = target.appendingPathComponent(directoryName)
+         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+ 
+@@ -115,10 +122,14 @@ class PlayTools {
+                     .appendingPathComponent(component)
+                     .appendingPathExtension(pathExtension)
+ 
+-        let source = bundledPlayToolsFramework
++        let source = sourceRoot
+                     .appendingPathComponent(directoryName)
+                     .appendingPathComponent(component)
+                     .appendingPathExtension(pathExtension)
++        if FileManager.default.fileExists(atPath: target.path),
++           FileManager.default.contentsEqual(atPath: source.path, andPath: target.path) {
++            return target
++        }
+         do {
+             try FileManager.default.copyItem(at: source, to: target)
+         } catch {
+

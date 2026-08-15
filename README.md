@@ -59,16 +59,39 @@ Fixes 3.1.0 camera + F1–F4 via profile-gated virtual Mouse. Installed only if 
 ```bash
 zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
 # installs only ~/Library/Frameworks, preserves PlayCover's Developer ID signature,
-# blocks PlayCover's startup overwrite, verifies hashes, and backs up to _work/install-backups/
+# verifies hashes, and backs up to _work/install-backups/
 ```
 
 Then in PlayCover: **Input Compatibility → Unity Native Mouse (Experimental)** → restart.
+
+For macOS 27, build the combined PlayCover 3.1.0 + patched PlayTools app. The
+source patch launches the canonical managed app URL instead of PlayCover's
+symlink bundle, preventing the misleading `(null)` LaunchServices permission
+alert. It also embeds the verified Option/F1–F4/Y-fix PlayTools build:
+
+```bash
+zsh tools/build_patched_playcover.sh
+# → dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip
+```
+
+The combined app is ad-hoc signed because no local Developer ID identity is
+available. It disables KeyCover in this local build so the old Developer ID
+keychain ACL cannot block startup; the existing plaintext PlayChain database is
+preserved. Install it as `/Applications/Playcover ZZZ PC UI.app`; do not keep a
+second `/Applications/PlayCover.app`. The normal in-app ZZZ launch button is the
+verified launch path.
+
+The wrapper selects `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`. This
+is the verified Y-fix binary paired with the layout-2 + MouseInputEnhancement
+null-safe UnityFramework. Only the embedded city-gate compatibility fingerprint
+is retargeted; the discarded city-gate game patch is not installed.
 
 ### Install from Release
 
 Download from [Releases](../../releases):
 
 - `PlayTools-simplified-citygate.framework.zip`
+- `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
 - `patch_zzz_global_ipa.py` (or clone this repo)
 
 ### Status
@@ -134,16 +157,38 @@ python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
 ```bash
 zsh tools/install_playtools_stage_safely.sh dist/PlayTools-simplified-citygate.framework
 # ~/Library/Frameworks에만 설치하고 PlayCover Developer ID 서명을 보존하며,
-# 시작 시 덮어쓰기를 차단하고 해시를 검증한 뒤 _work/install-backups/에 백업
+# 해시를 검증한 뒤 _work/install-backups/에 백업
 ```
 
 이후 PlayCover에서 **Input Compatibility → Unity Native Mouse (Experimental)** 활성화 → 재시작.
+
+macOS 27에서는 PlayCover 3.1.0과 패치된 PlayTools를 합친 앱을 빌드한다.
+소스 패치는 심볼릭 링크 번들 대신 관리 컨테이너의 실제 앱 URL을 직접 열어
+LaunchServices의 잘못된 `(null)` 권한 오류를 막고, Option/F1–F4/Y-fix가 검증된
+PlayTools를 앱 안에 포함한다.
+
+```bash
+zsh tools/build_patched_playcover.sh
+# → dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip
+```
+
+로컬 Developer ID 인증서가 없으므로 통합 앱은 ad-hoc 서명된다. 기존 Developer ID
+키체인 ACL이 시작을 멈추지 않도록 이 로컬 빌드에서는 KeyCover를 비활성화하며,
+현재 평문 PlayChain DB는 그대로 보존한다. `/Applications/Playcover ZZZ PC UI.app`으로
+설치하며 `/Applications/PlayCover.app`을 함께 두지 않는다. 새 앱 창의 일반 ZZZ 실행
+버튼이 검증된 실행 경로다.
+
+런처는 `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`을 선택한다. 검증된
+Y-fix 바이너리를 layout-2 + MouseInputEnhancement null-safe UnityFramework와
+조합하며, 내장 city-gate fingerprint만 원본 분기에 맞춘다. 실패한 city-gate
+게임 패치는 설치하지 않는다.
 
 ### 릴리즈에서 설치
 
 [Releases](../../releases)에서 다운로드:
 
 - `PlayTools-simplified-citygate.framework.zip`
+- `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
 - `patch_zzz_global_ipa.py` (또는 이 저장소 clone)
 
 ### 현재 상태
