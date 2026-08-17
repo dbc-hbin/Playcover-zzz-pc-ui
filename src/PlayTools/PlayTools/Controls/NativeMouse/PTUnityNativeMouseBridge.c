@@ -1142,9 +1142,25 @@ bool PTUnityNativeMouseObserveKeyboardHidUsage(uint16_t hidUsage, bool pressed) 
 bool PTUnityNativeMouseQueueKeyboardHidUsage(uint16_t hidUsage, bool pressed) {
     /* Queue one-byte deltas to the existing physical Keyboard. Creating a
        second Keyboard changes Keyboard.current and can hide held movement
-       keys even when the synthetic device only carries F1-F12. */
-    if (hidUsage < 58 || hidUsage > 69) {
-        return PTReport(PTUnityNativeMouseStatusUnsupportedKeyboardKey);
+       keys. Host/system modifiers, lock keys, and system keys deliberately
+       remain on AppKit's original path. */
+    switch (hidUsage) {
+        case 57:  /* CapsLock */
+        case 70:  /* PrintScreen */
+        case 71:  /* ScrollLock */
+        case 72:  /* Pause */
+        case 83:  /* NumLock */
+        case 101: /* ContextMenu */
+        case 224: /* LeftControl */
+        case 226: /* LeftOption */
+        case 227: /* LeftCommand */
+        case 228: /* RightControl */
+        case 229: /* RightShift */
+        case 230: /* RightOption */
+        case 231: /* RightCommand */
+            return PTReport(PTUnityNativeMouseStatusUnsupportedKeyboardKey);
+        default:
+            break;
     }
     const int32_t key = PTUnityKeyForHidUsage(hidUsage);
     if (key < 0 || key >= kKeyboardStateBytes * 8) {

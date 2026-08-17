@@ -1,54 +1,48 @@
-# Profile-gated Unity native mouse
+# Profile-Gated Unity Native Input
 
-PlayTools can optionally publish a virtual `Mouse` into a game's Unity
-InputSystem. The feature is experimental, disabled by default, and controlled
-per app from **Input Compatibility → Unity Native Mouse (Experimental)**. A
-restart is required after changing it.
+PlayTools publishes native InputSystem events only for the reviewed ZZZ Global 3.1.0 UnityFramework. The feature is controlled by **Input Compatibility → Unity Native Mouse (Experimental)** and requires PlayCover keymapping to be disabled.
 
-The bridge does not accept addresses from user settings. It only activates when
-an embedded profile matches all of the following:
+## Fail-Closed Profile
 
-- application bundle identifier;
-- UnityFramework Mach-O UUID;
-- profile and event-encoder versions;
-- reviewed 16-byte code fingerprints.
+Initialization requires all of the following:
 
-Unknown games and updated binaries remain inactive. A missing Unity image or an
-InputSystem that is not ready is retried at 250 ms intervals; an actual UUID or
-fingerprint mismatch permanently disables the bridge for that process before it
-calls game code.
+- exact application bundle identifier;
+- exact UnityFramework Mach-O UUID;
+- supported profile/event encoder versions;
+- readable IL2CPP root and InputSystem manager;
+- all reviewed 16-byte code fingerprints.
 
-The common event path supports position, relative movement, horizontal and
-vertical scroll, and five buttons (left, right, middle, forward, and back). It
-uses the existing AKInterface event monitors only when PlayTools keymapping is
-disabled, so the native path and fake-touch path do not process the same input.
+Runtime-not-ready states are retried at 250 ms intervals. UUID, schema, or fingerprint mismatches permanently disable native input for that process before game code is called.
 
-## Adding a game profile
+The stable profile targets the PC-layout, enabled-MouseInputEnhancement, null-safe UnityFramework described in the repository `STABLE_BUILD.md`. The discarded city and stream gates are not part of the profile.
 
-Add an immutable `PTUnityNativeMouseProfile` entry in
-`PlayTools/Controls/NativeMouse/PTUnityNativeMouseProfiles.c`. Every RVA must be
-derived from that exact UnityFramework build. Record the bundle identifier,
-Mach-O UUID, required root/manager offsets, and fingerprints for every called
-method and required patch site. Never add a wildcard UUID or a force mode.
+## Mouse
 
-The initial profile is `zzz-global-3.1.0-layout2-nullsafe-citygate`. It is tied
-to the verified ZZZ 3.1.0 PlayCover binary and its PC-layout, null-safe mouse,
-and local `StandaloneInputModule.mousePresent` gate patches.
+PlayTools creates one Unity `Mouse`, verifies that it becomes the current mouse, and queues complete `MOUS` state snapshots containing:
 
-## Validation boundary
+- absolute position with aspect-fit/letterbox conversion;
+- relative camera delta with corrected Y direction;
+- horizontal and vertical scroll;
+- left, right, middle, forward, and back buttons.
 
-The bridge publishes complete `MOUS` snapshots and one-byte `DLTA` events for
-F1-F12 through Unity's Input System. It intentionally does not mutate
-`InputDevice` flags: runtime
-evidence showed that native-bit promotion did not repair city clicks or DTEXT.
-The bridge resolves Unity's existing `Keyboard.current` and queues only USB HID
-usages 58 through 69 (F1-F12) to that device. It never adds a second Keyboard,
-which would replace `Keyboard.current`. Ordinary keys remain exclusively on the
-existing physical UIKit/GameController path to avoid duplicate movement state.
-The opt-in `PLAYTOOLS_KEYBOARD_OWNER` build is narrower: it synchronously owns
-only A/D/S/W, Q/E, Space, and Left Shift after an `UpdateState` readback. All
-menu, interaction, text-input, Option, Command, and lock keys stay on the
-original path.
-Runtime verification must use one clean process at a time and confirm startup,
-camera and keyboard regression safety, and city UI clicks before expanding the
-profile registry.
+Motion is limited to roughly 125 Hz. Relative movement is sent only while the cursor is captured; absolute position remains current in UI mode.
+
+## Serialized Keyboard
+
+PlayTools never creates another Keyboard. It resolves Unity's existing `Keyboard.current`, tracks AppKit key edges, and queues a one-byte `DLTA` for the affected key-state byte.
+
+All mapper-supported ordinary keys and F1–F12 use this single path. The AppKit edge is consumed only after the queue preconditions succeed. If a key-down cannot be queued, that full key cycle remains on the original AppKit path. Repeats are consumed only for a serial-owned key.
+
+The following remain passthrough:
+
+- Option, Command, Left/Right Control, Right Shift;
+- CapsLock, NumLock, ScrollLock;
+- PrintScreen, Pause, ContextMenu;
+- media, system, and unknown HID usages;
+- every key while a text editor is active.
+
+Focus loss, PlayCover keymapping activation, text editing, and input reset release every serial-owned key.
+
+## Explicit Non-Features
+
+The stable build does not define or install KeyboardOwner, release correction, delayed-release masks, GCKeyboard gates, InputArbiter, inline hooks, remap payloads, or Unity `OnUpdate` patches. Build validation rejects the arbiter and after-update hook symbols.

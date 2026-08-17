@@ -55,12 +55,16 @@ class PlayToolsFunctionKeyScopeTests(unittest.TestCase):
         for virtual_code in (13, 0, 1, 2, 56, 59):  # W, A, S, D, Shift, Control
             self.assertNotIn(mapping[virtual_code], range(58, 70))
 
-    def test_swift_and_c_enforce_function_key_only_boundary(self):
+    def test_swift_and_c_route_function_keys_through_serial_queue(self):
         swift = INPUT.read_text()
         bridge = BRIDGE.read_text()
-        self.assertIn("functionKeyHidUsageRange = 58...69", swift)
-        self.assertIn("functionKeyHidUsageRange.contains(rawUsage)", swift)
-        self.assertIn("if (hidUsage < 58 || hidUsage > 69)", bridge)
+        self.assertNotIn("functionKeyHidUsageRange", swift)
+        self.assertIn("F1-F12 use this same", swift)
+        self.assertIn("PTUnityNativeMouseQueueKeyboardHidUsage", bridge)
+        self.assertRegex(
+            swift,
+            r"if PTUnityNativeMouseQueueKeyboardHidUsage[\s\S]{0,220}return true",
+        )
 
         swap_mode = swift.split("swapMode:", 1)[1].split(")\n", 1)[0]
         self.assertNotIn("handleKeyboard", swap_mode)
@@ -84,7 +88,7 @@ class PlayToolsFunctionKeyScopeTests(unittest.TestCase):
 
         input_gate = swift.index("guard canQueueInput else")
         observe = swift.index("PTUnityNativeMouseObserveKeyboardHidUsage")
-        self.assertIn("functionKeyHidUsageRange.contains(rawUsage)", swift)
+        self.assertNotIn("functionKeyHidUsageRange", swift)
         self.assertLess(input_gate, observe)
 
     def test_w_trace_is_read_only_and_compile_time_gated(self):
@@ -106,7 +110,7 @@ class PlayToolsFunctionKeyScopeTests(unittest.TestCase):
     def test_keyboard_owner_routes_exceptions_and_ordinary_keys(self):
         swift = INPUT.read_text(); bridge = BRIDGE.read_text(); source = swift + bridge
         self.assertRegex(source, r"KeyboardOwner|keyboardOwner")
-        self.assertIn("functionKeyHidUsageRange = 58...69", swift)
+        self.assertNotIn("functionKeyHidUsageRange", swift)
         self.assertIn("PTUnityNativeMouseQueueKeyboardHidUsage", source)
         for usage in ("226", "230", "227", "231"):
             self.assertIn(usage, source)
@@ -114,16 +118,12 @@ class PlayToolsFunctionKeyScopeTests(unittest.TestCase):
         self.assertIn("return false", swift)
         self.assertRegex(source, r"PTUnityKeyboardOwner.*(Handle|Observe|Set)")
 
-    def test_gameplay_owner_scope_is_narrow_and_menu_keys_passthrough(self):
+    def test_serial_scope_uses_mapper_with_explicit_exclusions(self):
         bridge = BRIDGE.read_text(); swift = INPUT.read_text()
-        # The owner is intentionally limited to movement/action keys.  The
-        # owner implementation documents the HID usages directly so this
-        # regression catches accidental broad ownership of menu/interaction.
-        owner = bridge.split("static bool PTOwnerKeyForHid", 1)[-1]
-        for usage in (4, 7, 22, 26, 20, 8, 44, 225):
-            self.assertIn(f"case {usage}", owner)
-        self.assertIn("gameplay", bridge.lower())
-        self.assertIn("F1-F12 remain supplemental", bridge)
+        self.assertNotIn("serialGameplayHidUsages", swift)
+        self.assertIn("PTUnityKeyForHidUsage(hidUsage)", bridge)
+        for usage in (57, 70, 71, 72, 83, 101, 224, 226, 227, 228, 229, 230, 231):
+            self.assertIn(str(usage), swift.split("passthroughHidUsages", 1)[1])
         self.assertIn("passthroughHidUsages", swift)
 
     def test_keyboard_owner_has_no_deferred_correction_mechanisms(self):
@@ -146,8 +146,8 @@ class PlayToolsFunctionKeyScopeTests(unittest.TestCase):
     def test_keyboard_owner_build_is_separate_and_marked(self):
         script = OWNER_BUILD.read_text()
         self.assertIn("PLAYTOOLS_KEYBOARD_OWNER", script)
-        self.assertIn("PlayTools-GameplayOwner-nullsafe.framework.zip", script)
-        self.assertIn("GameplayOwner", script)
+        self.assertIn("PlayTools-MovementOwner-nullsafe.framework.zip", script)
+        self.assertIn("MovementOwner", script)
         self.assertIn("codesign --verify --deep --strict", script)
         self.assertIn("xcrun vtool -show-build", script)
 

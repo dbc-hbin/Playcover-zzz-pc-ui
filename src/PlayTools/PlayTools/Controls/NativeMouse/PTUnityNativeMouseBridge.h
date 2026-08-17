@@ -55,15 +55,16 @@ PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseQueueState(
     uint16_t clickCount
 );
 
-/// Queues one F1-F12 key as a byte delta on Unity's existing physical Keyboard.
-/// All other keyboard input remains on the original UIKit/GameController path.
+/// Queues one supported ordinary key as a byte delta on Unity's existing
+/// physical Keyboard. Host/system modifiers, lock keys, and system keys are
+/// rejected so their original AppKit path remains authoritative.
 PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseQueueKeyboardHidUsage(
     uint16_t hidUsage,
     bool pressed
 );
 
 /// Mirrors a physical key transition without queuing it. This preserves the
-/// untouched bits that share a byte with F1-F12 delta events.
+/// untouched bits that share a byte with serialized delta events.
 PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseObserveKeyboardHidUsage(
     uint16_t hidUsage,
     bool pressed

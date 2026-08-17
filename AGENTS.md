@@ -6,7 +6,7 @@
 - `src/PlayTools/` vendors the patched PlayTools Xcode project. Swift, Objective-C, and C sources live under `src/PlayTools/PlayTools/`; native Unity input code is in `Controls/NativeMouse/`.
 - `tests/` contains Python `unittest` regression tests. Name new modules `test_*.py` and test methods `test_*`.
 - `patches/` holds the reproducible PlayCover source patch. `dist/` contains release artifacts; `_work/` is for local analysis, backups, and temporary build evidence.
-- Treat `GOAL_ZZZ_UI_LAYOUT.md` and the patch table in `README.md` as the authority for supported UnityFramework changes.
+- Treat `STABLE_BUILD.md`, `GOAL_ZZZ_UI_LAYOUT.md`, and the patch table in `README.md` as the authority for supported UnityFramework changes.
 
 ## Build, Test, and Development Commands
 

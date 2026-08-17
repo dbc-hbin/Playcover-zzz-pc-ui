@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo=${0:A:h:h}
-zip=${PLAYTOOLS_ZIP:-$repo/dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip}
+zip=${PLAYTOOLS_ZIP:-$repo/dist/PlayTools-SerialKeyboard-nullsafe.framework.zip}
 installer=${PLAYTOOLS_INSTALLER:-$repo/tools/install_playtools_stage_safely.sh}
 unity_source=${ZZZ_UNITY_FRAMEWORK:-$repo/_work/artifacts/UnityFramework.pre-citygate-20260813-214408.backup}
 launch_constraint=${ZZZ_LAUNCH_CONSTRAINT:-$repo/tools/zzz-self-launch-constraint.plist}
@@ -18,10 +18,11 @@ app_ak_bundle=$game_app/PlugIns/AKInterface.bundle
 app_ak_binary=$app_ak_bundle/Contents/MacOS/AKInterface
 playcover_settings=$HOME/Library/Containers/io.playcover.PlayCover/App\ Settings/com.HoYoverse.Nap.plist
 game_preferences=$HOME/Library/Containers/com.HoYoverse.Nap/Data/Library/Preferences/com.HoYoverse.Nap.plist
-expected_sha=28a0a3e48935b2612bd0b5541d5e7c1a5751516a51a325fd0d0d48ae95713dbb
-expected_zip_sha=d8acecd8ea94c8f2a785b46623f779e0aae25e3a86cb7725e5b9c1924459ac2a
-expected_unity_sha=a2a91fa284bb126f3bfb7c72f311c1a34bd18afe67daaad658c7bca5358c8f2f
-expected_ak_sha=19686134a8f186dc57cd5d88c7a53c015995f987558e16e115fc7e4875d151cd
+expected_sha=${PLAYTOOLS_EXPECTED_SHA:-132701254ba9a4314e53476f702917f28f9dee2928fc427f8c03d16d4a41db96}
+expected_zip_sha=${PLAYTOOLS_EXPECTED_ZIP_SHA:-7ee375ddc1abc21a996251edcf74485cd4595358a273b72b70f12ae44b083df7}
+stage_name=${PLAYTOOLS_STAGE_NAME:-PlayTools-SerialKeyboard-nullsafe.framework}
+expected_unity_sha=${ZZZ_EXPECTED_UNITY_SHA:-a2a91fa284bb126f3bfb7c72f311c1a34bd18afe67daaad658c7bca5358c8f2f}
+expected_ak_sha=${PLAYTOOLS_EXPECTED_AK_SHA:-dab26672197b44e99b7fa9b03f2cad5b73c5fe69cf0ae9ca58657a0c7553765c}
 
 [[ -f $zip ]] || { print -u2 "patched PlayTools archive not found: $zip"; exit 65; }
 [[ -x $game_exec ]] || { print -u2 "PlayCover-installed ZZZ app not found: $game_app"; exit 66; }
@@ -55,7 +56,7 @@ fi
 stage_root=$(mktemp -d /tmp/zzz-playtools-stage.XXXXXX)
 trap 'find "$stage_root" -depth -delete 2>/dev/null || true' EXIT
 ditto -x -k "$zip" "$stage_root"
-stage=$stage_root/PlayTools-camera-yfix.framework
+stage=$stage_root/$stage_name
 
 [[ -f $stage/PlayTools ]] || { print -u2 'patched framework missing from archive'; exit 67; }
 stage_sha=$(shasum -a 256 "$stage/PlayTools" | awk '{print $1}')
@@ -145,10 +146,24 @@ otool -L "$game_exec" | grep -F "$user_framework/PlayTools" >/dev/null || {
 }
 
 open -n "$game_app"
-sleep 3
-pid=$(pgrep -fx "$game_exec" | head -1 || true)
+pid=''
+for _ in {1..20}; do
+  pid=$(pgrep -fx "$game_exec" | head -1 || true)
+  [[ -n $pid ]] && break
+  sleep 1
+done
 [[ -n $pid ]] || { print -u2 'ZenlessZoneZero did not stay running'; exit 71; }
-vmmap "$pid" 2>/dev/null | grep -F "$user_framework/PlayTools" >/dev/null || {
+mapped=false
+for _ in {1..60}; do
+  # vmmap canonicalizes the versioned framework executable symlink to
+  # PlayTools.framework/Versions/A/PlayTools, so match the framework root.
+  if vmmap "$pid" 2>/dev/null | grep -F "$user_framework/" >/dev/null; then
+    mapped=true
+    break
+  fi
+  sleep 1
+done
+[[ $mapped == true ]] || {
   print -u2 'running ZZZ process did not map the verified PlayTools framework'
   exit 74
 }

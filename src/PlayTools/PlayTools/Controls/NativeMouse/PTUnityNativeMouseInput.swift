@@ -79,13 +79,13 @@ final class PTUnityNativeMouseInput {
     static let shared = PTUnityNativeMouseInput()
 
     private let minimumMotionInterval = 1.0 / 125.0
-    private let functionKeyHidUsageRange = 58...69
-    // F1-F12 are kept on the existing supplemental-device route. Option and
-    // Command remain AppKit passthrough so cursor-toggle and host shortcuts
-    // retain their established behaviour. The C owner applies an explicit
-    // gameplay allowlist (A/D/S/W, Q/E, Space, Left Shift); all other
-    // ordinary keys therefore remain on the established path too.
-    private let passthroughHidUsages: Set<Int> = [57, 71, 83, 226, 227, 230, 231]
+    // Serialize every HID usage supported by the Unity Keyboard mapper except
+    // host/system modifiers, lock keys, and system keys. F1-F12 use this same
+    // single-owner path; there is no separate supplemental F-key route.
+    private let passthroughHidUsages: Set<Int> = [
+        57, 70, 71, 72, 83, 101,
+        224, 226, 227, 228, 229, 230, 231
+    ]
 
     private var started = false
     private var monitorsInstalled = false
@@ -101,6 +101,8 @@ final class PTUnityNativeMouseInput {
     private var cursorHiddenByBridge = false
     private var lastMotionSentAt = 0.0
     private var lastLoggedStatus: UInt32?
+    private var serialOwnedUsages = Set<Int>()
+    private var serialPassthroughHeldUsages = Set<Int>()
     private init() {}
 
     @discardableResult
@@ -123,7 +125,6 @@ final class PTUnityNativeMouseInput {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            PTUnityKeyboardOwnerReset()
             self?.releaseAllButtons()
             self?.releaseCursorCapture()
         }
@@ -132,7 +133,6 @@ final class PTUnityNativeMouseInput {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            _ = PTUnityKeyboardOwnerTryInitialize()
             self?.restoreCursorCaptureIfNeeded()
         }
         let center = NotificationCenter.default
@@ -140,17 +140,15 @@ final class PTUnityNativeMouseInput {
             UITextField.textDidBeginEditingNotification,
             UITextView.textDidBeginEditingNotification
         ] {
-            center.addObserver(forName: name, object: nil, queue: .main) { _ in
-                PTUnityKeyboardOwnerReset()
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.resetSerialKeyboardOwnership()
             }
         }
         for name in [
             UITextField.textDidEndEditingNotification,
             UITextView.textDidEndEditingNotification
         ] {
-            center.addObserver(forName: name, object: nil, queue: .main) { _ in
-                _ = PTUnityKeyboardOwnerTryInitialize()
-            }
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in }
         }
         return true
     }
@@ -161,9 +159,6 @@ final class PTUnityNativeMouseInput {
 #if PLAYTOOLS_W_TRACE
         PTKeyboardLatencyTrace.shared.tick(phase: "PRE_DRAIN")
 #endif
-        // Keep the direct Unity Keyboard owner ready independently of mouse
-        // publication/readiness. Keymapping only suspends mouse ownership.
-        _ = PTUnityKeyboardOwnerTryInitialize()
         _ = PTUnityNativeMouseTryInitialize()
         if PlaySettings.shared.keymapping {
             suspendForKeymappingIfNeeded()
@@ -314,20 +309,26 @@ final class PTUnityNativeMouseInput {
 #endif
         guard canQueueInput else { return false }
         _ = PTUnityNativeMouseObserveKeyboardHidUsage(UInt16(rawUsage), pressed)
-        if functionKeyHidUsageRange.contains(rawUsage) {
-            guard !isRepeat else { return false }
-            if !PTUnityNativeMouseQueueKeyboardHidUsage(UInt16(rawUsage), pressed) {
-                logStatusChangeIfNeeded()
+        if isTextInputActive || passthroughHidUsages.contains(rawUsage) ||
+            rawUsage > 111 && rawUsage != 225 { return false }
+        if isRepeat { return serialOwnedUsages.contains(rawUsage) }
+        if pressed {
+            if serialOwnedUsages.contains(rawUsage) { return true }
+            if PTUnityNativeMouseQueueKeyboardHidUsage(UInt16(rawUsage), true) {
+                serialOwnedUsages.insert(rawUsage)
+                serialPassthroughHeldUsages.remove(rawUsage)
+                return true
             }
+            serialPassthroughHeldUsages.insert(rawUsage)
+            logStatusChangeIfNeeded()
             return false
         }
-        if isTextInputActive || passthroughHidUsages.contains(rawUsage) ||
-            (rawUsage > 111 && !(224...229).contains(rawUsage)) { return false }
-        let result = PTUnityKeyboardOwnerHandleHidUsage(UInt16(rawUsage), pressed)
-        if result == PTUnityKeyboardOwnerConsumed {
+        if serialPassthroughHeldUsages.remove(rawUsage) != nil { return false }
+        guard serialOwnedUsages.remove(rawUsage) != nil else { return false }
+        if PTUnityNativeMouseQueueKeyboardHidUsage(UInt16(rawUsage), false) {
             return true
         }
-        if result == PTUnityKeyboardOwnerFailed { logStatusChangeIfNeeded() }
+        logStatusChangeIfNeeded()
         return false
     }
 
@@ -351,7 +352,7 @@ final class PTUnityNativeMouseInput {
     private func suspendForKeymappingIfNeeded() {
         guard !suspendedForKeymapping else { return }
         suspendedForKeymapping = true
-        PTUnityKeyboardOwnerReset()
+        resetSerialKeyboardOwnership()
         buttons = 0
         pendingDelta = .zero
         positionDirty = false
@@ -452,7 +453,7 @@ final class PTUnityNativeMouseInput {
     private func releaseAllButtons() {
         guard started, Thread.isMainThread else { return }
         buttons = 0
-        PTUnityKeyboardOwnerReset()
+        resetSerialKeyboardOwnership()
         pendingDelta = .zero
         positionDirty = false
         if monitorsInstalled {
@@ -461,6 +462,14 @@ final class PTUnityNativeMouseInput {
                 logStatusChangeIfNeeded()
             }
         }
+    }
+
+    private func resetSerialKeyboardOwnership() {
+        for usage in serialOwnedUsages {
+            _ = PTUnityNativeMouseQueueKeyboardHidUsage(UInt16(usage), false)
+        }
+        serialOwnedUsages.removeAll()
+        serialPassthroughHeldUsages.removeAll()
     }
 
     private func logStatusChangeIfNeeded() {

@@ -1,223 +1,88 @@
-# Playcover ZZZ PC UI — Global 3.1.0 Patch Set / ZZZ 글로벌 3.1.0 통합 패치 세트
+# PlayCover ZZZ PC UI — Stable Serial Keyboard Build
 
-> **Authority / 권위 문서**: `GOAL_ZZZ_UI_LAYOUT.md` + `_work/static-wide/PC_UI_MOUSE_BRIDGE_CONSOLIDATED_20260813_V2.md`  
-> Validated on live device: PC login/title UI + world entry (`CloseLogin → SceneSwitch complete`), no `MouseInputEnhancement` NRE.
+Zenless Zone Zero Global 3.1.0을 PlayCover에서 PC UI와 네이티브 마우스·키보드로 실행하기 위한 재현 가능한 패치 세트입니다. 현재 권위 문서는 [STABLE_BUILD.md](STABLE_BUILD.md)이며, 과거 Deep Research와 `_work/` 자료는 설계 이력일 뿐 배포 기준이 아닙니다.
 
----
+## 현재 안정 구성
 
-## English
+- 게임의 effective UI layout만 PC 값 `2`로 고정합니다. `Application.platform`, Metal, UIKit 경로는 변경하지 않습니다.
+- `MouseInputEnhancement`는 활성 상태로 유지하고, 초기 마우스 객체가 없을 때 zero baseline을 제공해 NRE를 방지합니다.
+- PlayTools는 Unity InputSystem에 가상 `Mouse` 하나를 게시해 카메라, 절대 위치, 스크롤, 5개 버튼을 전달합니다.
+- 키보드는 두 번째 장치를 만들지 않습니다. AppKit 입력을 Unity의 기존 `Keyboard.current`에 1바이트 `DLTA`로 직렬 전달합니다.
+- F1–F12 전용 보조 경로는 제거했습니다. F키도 일반 키와 같은 단일 직렬 경로를 사용합니다.
 
-### What this repo contains
+## UnityFramework 패치
 
-| Path | Description |
-|---|---|
-| `tools/patch_zzz_global_ipa.py` | **Minimal working patch** — applies exactly 2 verified UnityFramework patches to a user-owned IPA and re-signs it |
-| `src/PlayTools` | Patched PlayTools source for Option camera mode, F1–F4 forwarding, and corrected Y-axis input |
-| `dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip` | Verified patched PlayTools framework |
-| `patches/playcover-3.1.0-combined.patch` | Reproducible PlayCover 3.1.0 source patch for the combined app |
-| `dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip` | Combined PlayCover + patched PlayTools build |
+대상은 사용자가 보유한 Global 3.1.0 IPA의 `Payload/*.app/Frameworks/UnityFramework.framework/UnityFramework`입니다.
 
-Patched IPAs (`*.ipa`, `*.dmg`) are never committed.
-
-### The 2-site patch (and only this)
-
-Both at `Payload/*.app/Frameworks/UnityFramework.framework/UnityFramework`:
-
-| RVA | Original | Patched | Effect |
+| RVA | 원본 | 변경 | 효과 |
 |---|---|---|---|
-| `0xEC72310` | `e00313aa` `mov x0, x19` | `40008052` `mov w0, #2` | Force game-owned effective UI layout to **PC (2)**. `Application.platform` stays `4`, Metal/Gfx untouched |
-| `0xB3943B8` | `74a60139` `strb w20,[x19,#0x69]` | `7fa60139` `strb wzr,[x19,#0x69]` | Force `MouseInputEnhancement` disabled before `InitAllState` — avoids NRE when iOS mouse object at `+0x160` is null |
+| `0xEC72310` | `e00313aa` | `40008052` | effective UI layout을 PC `2`로 고정 |
+| `0xB392FF0` | `a02a00b4` | `802a00b4` | null mouse state를 zero-baseline 경로로 보냄 |
+| `0xB393540` | `12532395` | `00e4002f` | 초기 마우스 baseline을 0으로 설정 |
+| `0xB393544` | `11532395` | `aefeff17` | 기존 초기화 흐름으로 복귀 |
 
-*Size preserved, 5 bytes changed. Aborts if original bytes don't match (wrong build).*
-
-**Explicitly NOT included** (discarded per V2 §6): city gate `0x13685CD8`, stream gate `0x13686110`, `IsPCPlatform` / IL2CPP `IsPC`, `SwitchUILayoutPlatform` / `ConfirmUILayout`, `OSPROD`, shared `0x16584/0x16808/0x16850`.
-
-### Requirements
-
-- macOS with Xcode CLT (`codesign`, `xcrun vtool`, `otool`)
-- Python 3.8+
-- A **user-owned** `com.HoYoverse.Nap_3.1.0_und3fined.ipa` (not distributed)
-
-### Usage — IPA patch
+`0xB3943B8`은 원본 `74a60139`를 유지하므로 `MouseInputEnhancement`는 활성입니다. city `mousePresent` gate, stream gate, `IsPC`, OSPROD, 공유 platform getter/store, Unity `OnUpdate` hook은 포함하지 않습니다.
 
 ```bash
-# ad-hoc (TrollStore / Sideloadly)
-python3 tools/patch_zzz_global_ipa.py com.HoYoverse.Nap_3.1.0_und3fined.ipa
-# → com.HoYoverse.Nap_3.1.0_und3fined-pcui.ipa (SC_Info stripped, ad-hoc signed, --verify passed)
-
-# Apple Developer (personal signing)
-python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa --identity "Apple Development: Your Name (TEAMID)"
-
-# patch only, no signing (test)
-python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
+python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa --no-sign
+# 또는
+python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa \
+  --identity "Apple Development: Name (TEAMID)"
 ```
 
-The script: path-safe, metadata-preserving `ditto` extract → verify bytes at
-both offsets → patch → enforce executable mode `0755` and preserve entitlements → remove `SC_Info`
-while retaining untouched nested signatures → `codesign --force --sign <id>
---timestamp=none` (framework → app) → `codesign --verify --deep --strict` →
-atomic `ditto` repack → verify CRC, patch bytes, executable mode, symlinks, and
-`SC_Info` removal inside the IPA. It refuses to overwrite the source IPA.
+패처는 네 위치의 원본 바이트를 먼저 확인하고, 크기·실행 권한·symlink·CRC·`SC_Info` 제거·서명을 재검증합니다. 다른 빌드는 fail-closed로 중단합니다.
 
-### Usage — PlayTools (optional, macOS PlayCover)
+## 직렬 키보드 정책
 
-Fixes 3.1.0 camera + F1–F4 via profile-gated virtual Mouse. Installed only if you use PlayCover on macOS.
+직렬화 대상은 Unity mapper가 지원하는 일반 키입니다: A–Z, 숫자, 기호, Enter/Escape/Tab/Backspace/Space, 탐색키, 방향키, 숫자패드, Left Shift, F1–F12.
+
+다음 입력은 기존 AppKit 경로로 통과합니다.
+
+- Option, Command, 좌·우 Control, Right Shift
+- Caps/Num/Scroll Lock
+- Print Screen, Pause, Context Menu
+- 미디어·시스템·지원하지 않는 HID
+- 텍스트 필드, 텍스트 뷰, 검색창 편집 중 입력
+
+큐 준비가 실패한 key-down은 원본 AppKit 이벤트를 통과시키며, 그 키의 key-up도 같은 경로를 유지합니다. 앱 비활성화, 키매핑 전환, 텍스트 입력 시작 시 소유 중인 키를 해제합니다.
+
+## 빌드
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+zsh -n tools/*.sh
+python3 -m py_compile tools/*.py
+zsh tools/build_playtools.sh
+zsh tools/build_patched_playcover.sh
+```
+
+생성물:
+
+- `dist/PlayTools-SerialKeyboard-nullsafe.framework.zip`
+- `dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip`
+- `dist/ZZZ-PC-UI-SerialKeyboard-SHA256SUMS.txt`
+
+PlayCover 통합 앱은 ad-hoc 서명되며, 내부 `AKInterface.bundle`, `PlayTools.framework`, 최종 `.app`을 `codesign --verify --deep --strict`로 검증합니다.
+
+## 설치와 실행
 
 ```bash
 stage=$(mktemp -d)
-ditto -x -k dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip "$stage"
-zsh tools/install_playtools_stage_safely.sh "$stage/PlayTools-camera-yfix.framework"
-# installs only ~/Library/Frameworks, preserves PlayCover's Developer ID signature,
-# verifies hashes, and backs up to _work/install-backups/
+ditto -x -k dist/PlayTools-SerialKeyboard-nullsafe.framework.zip "$stage"
+zsh tools/install_playtools_stage_safely.sh \
+  "$stage/PlayTools-SerialKeyboard-nullsafe.framework"
+
+zsh tools/launch_zzz_with_patched_playtools.sh
 ```
 
-Then in PlayCover: **Input Compatibility → Unity Native Mouse (Experimental)** → restart.
+런처는 PlayCover 키매핑을 끄고 Unity Native Mouse를 활성화한 뒤, 설치된 PlayTools와 UnityFramework 해시, 코드 서명, 실제 프로세스 매핑을 확인합니다.
 
-For macOS 27, build the combined PlayCover 3.1.0 + patched PlayTools app. The
-source patch launches the canonical managed app URL instead of PlayCover's
-symlink bundle, preventing the misleading `(null)` LaunchServices permission
-alert. It also embeds the verified Option/F1–F4/Y-fix PlayTools build:
+## 검증 상태
 
-```bash
-zsh tools/build_patched_playcover.sh
-# → dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip
-```
+- PC UI 및 월드 진입: 검증됨
+- 카메라, 커서 캡처, Y축, 스크롤·버튼: 검증됨
+- 일반 전투 키와 F1–F12 단일 직렬 경로: 현재까지 가장 안정적인 실플레이 구성
+- 서명·Mac Catalyst arm64·아카이브 무결성: 빌드마다 검증
+- 도시 UI 클릭과 게임 내부 리바인딩 표시는 별도 게임 경계이며 이 패치가 보장하지 않습니다.
 
-The combined app is ad-hoc signed because no local Developer ID identity is
-available. It disables KeyCover in this local build so the old Developer ID
-keychain ACL cannot block startup; the existing plaintext PlayChain database is
-preserved. Install it as `/Applications/Playcover ZZZ PC UI.app`; do not keep a
-second `/Applications/PlayCover.app`. The normal in-app ZZZ launch button is the
-verified launch path.
-
-The wrapper selects `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`. This
-is the verified Y-fix binary paired with the layout-2 + MouseInputEnhancement
-null-safe UnityFramework. Only the embedded city-gate compatibility fingerprint
-is retargeted; the discarded city-gate game patch is not installed.
-
-### Install from Release
-
-Download from [Releases](../../releases):
-
-- `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`
-- `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
-- `patch_zzz_global_ipa.py` (or clone this repo)
-
-### Status
-
-- PC UI + world entry: **verified on device**
-- Camera + F1–F4 via PlayTools: **verified**
-- City/free-roam cursor click: **known failure** (C/F gates did not fix; next candidate is description-based `AddDevice` ABI-v3, not yet shipped)
-- Settings `DTEXT` / rebind: **open** (see V2)
-
----
-
-## 한국어
-
-### 이 저장소가 포함하는 것
-
-| 경로 | 설명 |
-|---|---|
-| `tools/patch_zzz_global_ipa.py` | **작동하는 최소 패치** — 사용자가 보유한 IPA에 검증된 2곳만 패치하고 자동 재서명 |
-| `src/PlayTools` | Option 카메라 모드, F1–F4 전달, Y축 보정을 포함한 PlayTools 소스 |
-| `dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip` | 검증된 패치 PlayTools 프레임워크 |
-| `patches/playcover-3.1.0-combined.patch` | 통합 앱을 재현하는 PlayCover 3.1.0 소스 패치 |
-| `dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip` | PlayCover + 패치된 PlayTools 통합 빌드 |
-
-패치된 IPA(`*.ipa`, `*.dmg`)는 절대 커밋하지 않음.
-
-### 2곳 패치 (이것만)
-
-대상: `Payload/*.app/Frameworks/UnityFramework.framework/UnityFramework`
-
-| RVA | 원본 | 패치 | 효과 |
-|---|---|---|---|
-| `0xEC72310` | `e00313aa` `mov x0, x19` | `40008052` `mov w0, #2` | 게임 전용 effective UI layout을 **PC(2)** 로 고정. `Application.platform`은 `4` 유지, Metal/Gfx 미변경 |
-| `0xB3943B8` | `74a60139` `strb w20,[x19,#0x69]` | `7fa60139` `strb wzr,[x19,#0x69]` | `MouseInputEnhancement`를 `InitAllState` 전에 disabled로 강제 — iOS 마우스 객체(`+0x160`)가 null일 때 NRE 방지 |
-
-*파일 크기 유지, 5바이트 변경. 원본 바이트가 다르면 빌드 불일치로 중단.*
-
-**명시적으로 포함하지 않음** (V2 §6에서 폐기): city gate `0x13685CD8`, stream gate `0x13686110`, `IsPCPlatform` / IL2CPP `IsPC`, `SwitchUILayoutPlatform` / `ConfirmUILayout`, `OSPROD`, shared `0x16584/0x16808/0x16850`.
-
-### 요구 사항
-
-- Xcode CLT가 설치된 macOS (`codesign`, `xcrun vtool`, `otool`)
-- Python 3.8+
-- 사용자가 직접 보유한 `com.HoYoverse.Nap_3.1.0_und3fined.ipa` (배포하지 않음)
-
-### 사용법 — IPA 패치
-
-```bash
-# ad-hoc (TrollStore / Sideloadly)
-python3 tools/patch_zzz_global_ipa.py com.HoYoverse.Nap_3.1.0_und3fined.ipa
-# → com.HoYoverse.Nap_3.1.0_und3fined-pcui.ipa (SC_Info 제거, ad-hoc 서명, --verify 통과)
-
-# Apple Developer (개인 서명)
-python3 tools/patch_zzz_global_ipa.py input.ipa output.ipa --identity "Apple Development: 홍길동 (TEAMID)"
-
-# 패치만 하고 서명 생략 (테스트)
-python3 tools/patch_zzz_global_ipa.py input.ipa --no-sign
-```
-
-동작: 경로를 검증하고 메타데이터를 보존하는 `ditto` 압축 해제 → 두 오프셋
-바이트 검증 → 패치 → 실행 권한 `0755` 강제 및 entitlement 보존 → 수정하지 않은 중첩 서명은 유지하면서
-`SC_Info`만 제거 → `codesign --force --sign <id>` (framework → app 순) →
-`codesign --verify --deep --strict` → 원자적 `ditto` 재패키징 → IPA 내부 CRC,
-패치 바이트, 실행 권한, 심볼릭 링크, `SC_Info` 제거 재검증. 원본 IPA와 같은
-출력 경로는 거부한다.
-
-### 사용법 — PlayTools (선택, macOS PlayCover)
-
-3.1.0 카메라 + F1–F4를 profile-gated 가상 Mouse로 복구. PlayCover를 쓰는 경우에만 설치.
-
-```bash
-stage=$(mktemp -d)
-ditto -x -k dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip "$stage"
-zsh tools/install_playtools_stage_safely.sh "$stage/PlayTools-camera-yfix.framework"
-# ~/Library/Frameworks에만 설치하고 PlayCover Developer ID 서명을 보존하며,
-# 해시를 검증한 뒤 _work/install-backups/에 백업
-```
-
-이후 PlayCover에서 **Input Compatibility → Unity Native Mouse (Experimental)** 활성화 → 재시작.
-
-macOS 27에서는 PlayCover 3.1.0과 패치된 PlayTools를 합친 앱을 빌드한다.
-소스 패치는 심볼릭 링크 번들 대신 관리 컨테이너의 실제 앱 URL을 직접 열어
-LaunchServices의 잘못된 `(null)` 권한 오류를 막고, Option/F1–F4/Y-fix가 검증된
-PlayTools를 앱 안에 포함한다.
-
-```bash
-zsh tools/build_patched_playcover.sh
-# → dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip
-```
-
-로컬 Developer ID 인증서가 없으므로 통합 앱은 ad-hoc 서명된다. 기존 Developer ID
-키체인 ACL이 시작을 멈추지 않도록 이 로컬 빌드에서는 KeyCover를 비활성화하며,
-현재 평문 PlayChain DB는 그대로 보존한다. `/Applications/Playcover ZZZ PC UI.app`으로
-설치하며 `/Applications/PlayCover.app`을 함께 두지 않는다. 새 앱 창의 일반 ZZZ 실행
-버튼이 검증된 실행 경로다.
-
-런처는 `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`을 선택한다. 검증된
-Y-fix 바이너리를 layout-2 + MouseInputEnhancement null-safe UnityFramework와
-조합하며, 내장 city-gate fingerprint만 원본 분기에 맞춘다. 실패한 city-gate
-게임 패치는 설치하지 않는다.
-
-### 릴리즈에서 설치
-
-[Releases](../../releases)에서 다운로드:
-
-- `PlayTools-camera-yfix-nullsafe-nocity.framework.zip`
-- `Playcover-ZZZ-PC-UI-3.1.0.app.zip`
-- `patch_zzz_global_ipa.py` (또는 이 저장소 clone)
-
-### 현재 상태
-
-- PC UI + 월드 진입: **실기기 검증 완료**
-- PlayTools 경유 카메라 + F1–F4: **검증 완료**
-- 도시/free-roam 커서 클릭: **실패 확인됨** (C/F 게이트로 미해결; 다음 후보는 `AddDevice` ABI-v3, 아직 미출시)
-- 설정 `DTEXT` / 리바인딩: **미해결** (자세한 내용은 V2 문서 참조)
-
-### License
-
-AGPL-3.0 — PlayTools is AGPL-3.0. This repo distributes its patched source under
-`src/PlayTools` and the patched framework as a build artifact. Patched IPAs are
-not distributed.
+IPAs, DMGs, 계정 정보, 서명 인증서는 저장소에 커밋하지 않습니다.

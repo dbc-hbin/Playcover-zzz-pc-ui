@@ -1,0 +1,8 @@
+7ee375ddc1abc21a996251edcf74485cd4595358a273b72b70f12ae44b083df7  PlayTools-SerialKeyboard-nullsafe.framework.zip
+5c10c29725b695fe2692629330306f43bad775fea612203b34ef8fa0cbdc44b4  Playcover-ZZZ-PC-UI-3.1.0.app.zip
+d9eec1dba4f221c2d15d7974f684846979206eb7442fd225c846c90b692718f7  ../tools/patch_zzz_global_ipa.py
+
+# Embedded binaries verified after extracting the combined app archive:
+4e3c1c8a9b0d6a76721bb820d977f02969cb9a3741028c457211fcb6b9c05f67  PlayCover
+132701254ba9a4314e53476f702917f28f9dee2928fc427f8c03d16d4a41db96  PlayTools
+dab26672197b44e99b7fa9b03f2cad5b73c5fe69cf0ae9ca58657a0c7553765c  AKInterface

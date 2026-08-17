@@ -13,6 +13,21 @@ SPEC.loader.exec_module(PATCHER)
 
 
 class PatchIpaTests(unittest.TestCase):
+    def test_stable_patch_manifest_uses_pc_layout_and_null_safe_mouse(self):
+        self.assertEqual(
+            [(offset, original.hex(), replacement.hex())
+             for offset, original, replacement, _ in self.original_patches],
+            [
+                (0xEC72310, "e00313aa", "40008052"),
+                (0xB392FF0, "a02a00b4", "802a00b4"),
+                (0xB393540, "12532395", "00e4002f"),
+                (0xB393544, "11532395", "aefeff17"),
+            ],
+        )
+        self.assertNotIn(0xB3943B8, [item[0] for item in self.original_patches])
+        self.assertNotIn(0x13685CD8, [item[0] for item in self.original_patches])
+        self.assertNotIn(0x13686110, [item[0] for item in self.original_patches])
+
     def setUp(self):
         self.original_patches = PATCHER.PATCHES
         PATCHER.PATCHES = [

@@ -5,13 +5,13 @@ repo=${0:A:h:h}
 source_dir=${PLAYCOVER_SOURCE_DIR:-$repo/_work/PlayCover-src-build}
 build_dir=${PLAYCOVER_BUILD_DIR:-/tmp/playcover-zzz-build}
 spm_dir=${PLAYCOVER_SPM_DIR:-/tmp/playcover-zzz-spm}
-playtools_zip=${PLAYTOOLS_ZIP:-$repo/dist/PlayTools-camera-yfix-nullsafe-nocity.framework.zip}
+playtools_zip=${PLAYTOOLS_ZIP:-$repo/dist/PlayTools-SerialKeyboard-nullsafe.framework.zip}
 patch_file=$repo/patches/playcover-3.1.0-combined.patch
 output=$repo/dist/Playcover-ZZZ-PC-UI-3.1.0.app.zip
 
 playcover_commit=a103786e03b7f6257b6b489dfc49ca6712423a2e
-playtools_zip_sha=d8acecd8ea94c8f2a785b46623f779e0aae25e3a86cb7725e5b9c1924459ac2a
-playtools_raw_sha=28a0a3e48935b2612bd0b5541d5e7c1a5751516a51a325fd0d0d48ae95713dbb
+playtools_zip_sha=7ee375ddc1abc21a996251edcf74485cd4595358a273b72b70f12ae44b083df7
+playtools_raw_sha=132701254ba9a4314e53476f702917f28f9dee2928fc427f8c03d16d4a41db96
 
 [[ -f $playtools_zip ]] || { print -u2 "missing patched PlayTools: $playtools_zip"; exit 65; }
 [[ -f $patch_file ]] || { print -u2 "missing PlayCover patch: $patch_file"; exit 66; }
@@ -46,24 +46,30 @@ fw=$frameworks[1]
   exit 71
 }
 
-# Xcode 27 validates embedded macOS frameworks as versioned bundles. Convert
-# the verified Catalyst framework without rebuilding its feature-bearing code.
-[[ -d $fw/_CodeSignature ]] && find "$fw/_CodeSignature" -depth -delete
-mkdir -p "$fw/Versions/A/Resources"
-mv "$fw/PlayTools" "$fw/Versions/A/PlayTools"
-mv "$fw/Headers" "$fw/Versions/A/Headers"
-mv "$fw/Modules" "$fw/Versions/A/Modules"
-mv "$fw/PlugIns" "$fw/Versions/A/PlugIns"
-mv "$fw/Info.plist" "$fw/Versions/A/Resources/Info.plist"
-for locale in "$fw"/*.lproj(N); do
-  mv "$locale" "$fw/Versions/A/Resources/${locale:t}"
-done
-ln -s A "$fw/Versions/Current"
-ln -s Versions/Current/PlayTools "$fw/PlayTools"
-ln -s Versions/Current/Headers "$fw/Headers"
-ln -s Versions/Current/Modules "$fw/Modules"
-ln -s Versions/Current/PlugIns "$fw/PlugIns"
-ln -s Versions/Current/Resources "$fw/Resources"
+# Xcode 27 validates embedded macOS frameworks as versioned bundles. Current
+# source builds already use that layout; retain conversion for older flat input.
+if [[ ! -d $fw/Versions/A || ! -L $fw/PlayTools ]]; then
+  [[ -d $fw/_CodeSignature ]] && find "$fw/_CodeSignature" -depth -delete
+  mkdir -p "$fw/Versions/A/Resources"
+  mv "$fw/PlayTools" "$fw/Versions/A/PlayTools"
+  mv "$fw/Headers" "$fw/Versions/A/Headers"
+  mv "$fw/Modules" "$fw/Versions/A/Modules"
+  mv "$fw/PlugIns" "$fw/Versions/A/PlugIns"
+  mv "$fw/Info.plist" "$fw/Versions/A/Resources/Info.plist"
+  for locale in "$fw"/*.lproj(N); do
+    mv "$locale" "$fw/Versions/A/Resources/${locale:t}"
+  done
+  ln -s A "$fw/Versions/Current"
+  ln -s Versions/Current/PlayTools "$fw/PlayTools"
+  ln -s Versions/Current/Headers "$fw/Headers"
+  ln -s Versions/Current/Modules "$fw/Modules"
+  ln -s Versions/Current/PlugIns "$fw/PlugIns"
+  ln -s Versions/Current/Resources "$fw/Resources"
+fi
+[[ -f $fw/Versions/A/Resources/Info.plist ]] || {
+  print -u2 'PlayTools versioned framework Info.plist missing'
+  exit 72
+}
 codesign --force --sign - --timestamp=none "$fw/PlugIns/AKInterface.bundle"
 codesign --force --sign - --timestamp=none "$fw"
 codesign --verify --deep --strict "$fw"
@@ -110,6 +116,12 @@ package_root=$(mktemp -d /tmp/playcover-zzz-package.XXXXXX)
 named_app=$package_root/Playcover\ ZZZ\ PC\ UI.app
 ditto "$app" "$named_app"
 codesign --verify --deep --strict "$named_app"
+embedded_playtools_sha=$(shasum -a 256 \
+  "$named_app/Contents/Frameworks/PlayTools.framework/PlayTools" | awk '{print $1}')
+[[ $embedded_playtools_sha == $playtools_raw_sha ]] || {
+  print -u2 'combined app embedded PlayTools hash mismatch'
+  exit 73
+}
 [[ -e $output ]] && unlink "$output"
 ditto -c -k --sequesterRsrc --keepParent "$named_app" "$output"
 unzip -tq "$output" >/dev/null
@@ -118,5 +130,5 @@ print "built=$app"
 print "named=$named_app"
 print "archive=$output"
 print "PlayCover SHA256=$(shasum -a 256 "$named_app/Contents/MacOS/PlayCover" | awk '{print $1}')"
-print "PlayTools SHA256=$(shasum -a 256 "$named_app/Contents/Frameworks/PlayTools.framework/PlayTools" | awk '{print $1}')"
+print "PlayTools SHA256=$embedded_playtools_sha"
 find "$package_root" -depth -delete

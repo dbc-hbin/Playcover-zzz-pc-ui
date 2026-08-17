@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-ZZZ Global 3.1.0 IPA 패치 - GOAL_ZZZ_UI_LAYOUT.md 권위 패치 2건만 적용
+ZZZ Global 3.1.0 stable PC-UI/null-safe patch.
 
-  0xEC72310  e00313aa (mov x0,x19) -> 40008052 (mov w0,#2)   PC UI layout=2
-  0xB3943B8  74a60139 (strb w20,[x19,#0x69]) -> 7fa60139 (strb wzr,[x19,#0x69])
-              MouseInputEnhancement disabled
+The patch keeps Application.platform on iPhonePlayer, forces only the game's
+effective UI layout to PC, and leaves MouseInputEnhancement enabled while
+routing a missing initial mouse state through a zero baseline.
 
-폐기된 패치 절대 포함 금지: C(0x13685CD8), F(0x13686110), AppUtils IsPC, IL2CPP IsPC,
-SwitchUILayoutPlatform/ConfirmUILayout, OSPROD, shared getter/store (0x16584/0x16808/0x16850)
+Discarded patches are never included: city mousePresent/stream gates,
+AppUtils/IL2CPP IsPC, SwitchUILayoutPlatform/ConfirmUILayout, OSPROD, shared
+platform getter/store, and every Unity InputSystem OnUpdate hook.
 
-IPA 해제 -> 실행 권한 0755 강제/entitlement 보존 -> UnityFramework 바이트 검증 -> 2곳 patch
+IPA 해제 -> 실행 권한 0755 강제/entitlement 보존 -> UnityFramework 바이트 검증 -> 4곳 patch
 -> SC_Info 제거 -> codesign (framework -> app 순서) -> --verify -> 원자적 재패키징
 -> IPA 내부 패치/실행 권한/심볼릭 링크 재검증
 """
@@ -28,7 +29,9 @@ import zipfile
 
 PATCHES = [
     (0xEC72310, bytes.fromhex("e00313aa"), bytes.fromhex("40008052"), "PC UI layout 2 (mov x0,x19 -> mov w0,#2)"),
-    (0xB3943B8, bytes.fromhex("74a60139"), bytes.fromhex("7fa60139"), "MouseInputEnhancement disabled (strb w20 -> strb wzr)"),
+    (0xB392FF0, bytes.fromhex("a02a00b4"), bytes.fromhex("802a00b4"), "null mouse state -> zero baseline"),
+    (0xB393540, bytes.fromhex("12532395"), bytes.fromhex("00e4002f"), "zero initial mouse baseline"),
+    (0xB393544, bytes.fromhex("11532395"), bytes.fromhex("aefeff17"), "rejoin mouse initialization"),
 ]
 
 # PlayCover 기준값 (IPA는 크기가 다를 수 있음 - 바이트 검증이 권위)
