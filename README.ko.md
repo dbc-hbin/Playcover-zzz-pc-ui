@@ -6,6 +6,8 @@ Zenless Zone Zero Global 3.1.0을 Apple Silicon Mac에서 **PC UI, 네이티브 
 
 > **Option 키를 눌러 카메라 조작과 보이는 커서를 전환합니다.**
 
+> **패치 후 게임 입력 방식을 절대 `화면 터치`로 바꾸지 마세요. 설정에서 다시 되돌리는 것만으로는 패치 입력 경로가 정상 복구되지 않으며, 패치된 IPA를 다시 설치해야 합니다.**
+
 이 README의 위쪽은 일반 사용자를 위한 설치 안내이고, 아래쪽의 [에이전트·기여자 기술 참조](#에이전트기여자-기술-참조)는 정확한 바이트와 빌드 경계를 다룹니다. 현재 배포 규격의 최종 기준은 [STABLE_BUILD.md](STABLE_BUILD.md)입니다.
 
 > 이 저장소는 게임 IPA를 제공하지 않습니다. 본인이 소유한 **Global 3.1.0 IPA**가 필요합니다. 다른 버전은 패처가 원본 바이트 불일치로 중단합니다.
@@ -67,7 +69,8 @@ python3 tools/patch_zzz_global_ipa.py input.ipa output-pcui.ipa \
 1. `/Applications/Playcover ZZZ PC UI.app`을 엽니다.
 2. 2단계에서 만든 `*-pcui.ipa`를 PlayCover에 설치합니다.
 3. 게임 설정에서 **PlayCover 키매핑을 끄고**, **Experimental Unity Native Mouse를 켭니다**.
-4. PlayCover와 게임을 모두 종료합니다.
+4. 설치 후 게임 입력 방식을 **화면 터치**로 바꾸지 마세요. 바꿨다면 설정만 되돌리지 말고 패치된 IPA를 다시 설치하세요.
+5. PlayCover와 게임을 모두 종료합니다.
 
 PlayCover 앱 ZIP에는 PlayTools가 포함되어 있지만, 게임이 실제로 읽는 사용자 프레임워크를 확실히 맞추려면 다음 단계도 실행하는 것을 권장합니다.
 
@@ -125,6 +128,10 @@ PlayCover와 ZZZ를 완전히 종료한 뒤 다시 실행하세요. 실행 중�
 
 PlayCover의 게임별 키매핑을 끄고 Experimental Unity Native Mouse가 켜져 있는지 확인하세요. 텍스트 필드에서는 의도적으로 원래 AppKit 입력을 사용합니다.
 
+### 입력 방식을 화면 터치로 바꿈
+
+설정을 반복해서 전환하지 마세요. `*-pcui.ipa`를 다시 설치해야 하며, 설정에서 입력 방식만 되돌리는 것은 신뢰할 수 있는 복구 방법이 아닙니다.
+
 ### macOS가 앱 실행을 막음
 
 이 배포본은 ad-hoc 서명입니다. 본인이 이 저장소에서 받은 파일임을 확인한 뒤 Finder의 **우클릭 → 열기**를 사용하세요. 조직 정책이나 Gatekeeper를 우회하도록 시스템 보안을 전역으로 끄지는 마세요.
@@ -168,7 +175,7 @@ shasum -a 256 \
 3. [GOAL_ZZZ_UI_LAYOUT.md](GOAL_ZZZ_UI_LAYOUT.md)
 4. 현재 빌드·패치 스크립트와 회귀 테스트
 
-`DEEP_RESEARCH_*`, `PRO_*`, `_work/`, InputArbiter/KeyboardOwner/ReleaseCorrection 산출물은 조사 이력 또는 실험물이다. 안정 배포 근거로 승격하지 않는다.
+[EXPERIMENTS.md](EXPERIMENTS.md)에 폐기한 접근과 결론을 간략히 정리했습니다. InputArbiter/KeyboardOwner/ReleaseCorrection 산출물은 안정 배포에 포함하지 않습니다.
 
 지원 대상은 ZZZ Global 3.1.0, PlayCover 3.1.0, arm64 Mac Catalyst다. IPA, DMG, 인증서, 계정 정보, 컨테이너 데이터는 커밋하지 않는다.
 

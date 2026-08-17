@@ -6,6 +6,8 @@ A patch set for running Zenless Zone Zero Global 3.1.0 on an Apple Silicon Mac w
 
 > **Press Option to switch between camera control and the visible cursor.**
 
+> **After patching, never change the in-game input mode back to Touchscreen. Changing it back in Settings does not reliably restore the patched input path; you must reinstall the patched IPA.**
+
 The first half of this README is a user-friendly installation guide. Exact bytes, hashes, and maintenance boundaries are in [Agent and Contributor Technical Reference](#agent-and-contributor-technical-reference). [STABLE_BUILD.md](STABLE_BUILD.md) is the authoritative release specification.
 
 > This repository does not distribute the game IPA. You must provide your own **Global 3.1.0 IPA**. The patcher fails closed when the original bytes do not match.
@@ -68,7 +70,8 @@ python3 tools/patch_zzz_global_ipa.py input.ipa output-pcui.ipa \
 2. Install the `*-pcui.ipa` produced in step 2.
 3. Disable **PlayCover key mapping** for the game.
 4. Enable **Experimental Unity Native Mouse**.
-5. Quit both PlayCover and the game before installing PlayTools.
+5. Do not change the in-game input mode to **Touchscreen** after installation. If you do, reinstall the patched IPA instead of only changing the setting back.
+6. Quit both PlayCover and the game before installing PlayTools.
 
 The PlayCover app archive embeds PlayTools. Installing the verified user framework below is still recommended because that is the copy loaded directly by the game.
 
@@ -126,6 +129,10 @@ Quit PlayCover and ZZZ completely, then retry. The installer intentionally refus
 
 Disable PlayCover's per-game key mapping and verify that Experimental Unity Native Mouse is enabled. Text editors intentionally use the original AppKit path.
 
+### Input mode was changed to Touchscreen
+
+Do not keep toggling the setting. Reinstall the patched `*-pcui.ipa`; changing the input mode back in Settings is not a reliable recovery path.
+
 ### macOS blocks the app
 
 This is an ad-hoc-signed local build. After verifying that the archive came from this repository, use **Control-click → Open** in Finder. Do not disable system-wide security or organizational Gatekeeper policy.
@@ -169,7 +176,7 @@ Use this authority order:
 3. [GOAL_ZZZ_UI_LAYOUT.md](GOAL_ZZZ_UI_LAYOUT.md)
 4. Current build and patch scripts, followed by regression tests
 
-`DEEP_RESEARCH_*`, `PRO_*`, `_work/`, and InputArbiter/KeyboardOwner/ReleaseCorrection artifacts are research history or experiments. Do not promote them to the stable distribution.
+[EXPERIMENTS.md](EXPERIMENTS.md) summarizes the discarded approaches and their conclusions. InputArbiter/KeyboardOwner/ReleaseCorrection artifacts are not part of the stable distribution.
 
 Supported target: ZZZ Global 3.1.0, PlayCover 3.1.0, arm64 Mac Catalyst. Never commit IPAs, DMGs, credentials, signing identities, or container data.
 
