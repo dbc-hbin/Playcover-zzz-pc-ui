@@ -130,6 +130,17 @@ class AKPlugin: NSObject, Plugin {
 
     private var modifierFlag: UInt = 0
 
+    private func modifierFlag(forKeyCode keyCode: UInt16) -> NSEvent.ModifierFlags? {
+        switch keyCode {
+        case 54, 55: return .command
+        case 56, 60: return .shift
+        case 58, 61: return .option
+        case 59, 62: return .control
+        case 63: return .function
+        default: return nil
+        }
+    }
+
     // swiftlint:disable:next function_body_length
     func setupKeyboard(keyboard: @escaping (UInt16, Bool, Bool, Bool) -> Bool,
                        swapMode: @escaping (UInt16) -> Bool) {
@@ -168,11 +179,20 @@ class AKPlugin: NSObject, Plugin {
             if checkCmd(modifier: event.modifierFlags) {
                 return event
             }
-            let pressed = self.modifierFlag < event.modifierFlags.rawValue
-            let changed = self.modifierFlag ^ event.modifierFlags.rawValue
-            self.modifierFlag = event.modifierFlags.rawValue
-            let changedFlags = NSEvent.ModifierFlags(rawValue: changed)
-            if pressed && changedFlags.contains(.option) {
+            let previousFlags = NSEvent.ModifierFlags(rawValue: self.modifierFlag)
+            let currentFlags = event.modifierFlags
+            let changedFlags = NSEvent.ModifierFlags(rawValue:
+                previousFlags.rawValue ^ currentFlags.rawValue)
+            self.modifierFlag = currentFlags.rawValue
+            guard let eventFlag = self.modifierFlag(forKeyCode: event.keyCode) else {
+                return event
+            }
+            // Determine the transition from this modifier's own bit. A
+            // numeric comparison of the complete flag word misclassifies
+            // simultaneous modifier changes.
+            guard changedFlags.contains(eventFlag) else { return event }
+            let pressed = currentFlags.contains(eventFlag)
+            if pressed && eventFlag == .option {
                 if swapMode(event.keyCode) {
                     return nil
                 }
@@ -185,6 +205,16 @@ class AKPlugin: NSObject, Plugin {
             }
             return event
         })
+    }
+
+    /// Passive modifier observation used by native correction. The event is
+    /// always returned so Command handling/consumption remains unchanged.
+    func setupCommandObserver(_ observer: @escaping (Bool) -> Void) {
+        observer(CGEventSource.flagsState(.combinedSessionState).contains(.maskCommand))
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
+            observer(event.modifierFlags.contains(.command))
+            return event
+        }
     }
 
     func setupMouseMoved(_ mouseMoved: @escaping (CGFloat, CGFloat) -> Bool) {

@@ -21,8 +21,13 @@ typedef struct {
     uintptr_t inputSystemLoadLayoutRva;
     uintptr_t inputSystemAddDeviceRva;
     uintptr_t inputDeviceIdRva;
+    uintptr_t keyboardCurrentRva;
+    uintptr_t frontBufferForDeviceRva;
     uintptr_t inputSystemQueueEventRva;
     uintptr_t nativeInputRuntimeCurrentTimeRva;
+    uintptr_t invokeAfterUpdateCallbackRva;
+    uintptr_t inputSystemUpdateStateRva;
+    uintptr_t nativeInputRuntimeFixedTimeRva;
     uintptr_t il2cppRootSlotRva;
     uintptr_t inputSystemManagerOffset;
     uintptr_t mouseCurrentOffset;

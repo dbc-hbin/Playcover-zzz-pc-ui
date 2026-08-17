@@ -55,14 +55,63 @@ PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseQueueState(
     uint16_t clickCount
 );
 
-/// Queues one physical keyboard key using the USB HID usage values already
-/// produced by PlayTools' NSEvent mapping.
+/// Queues one F1-F12 key as a byte delta on Unity's existing physical Keyboard.
+/// All other keyboard input remains on the original UIKit/GameController path.
 PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseQueueKeyboardHidUsage(
     uint16_t hidUsage,
     bool pressed
 );
 
+/// Mirrors a physical key transition without queuing it. This preserves the
+/// untouched bits that share a byte with F1-F12 delta events.
+PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseObserveKeyboardHidUsage(
+    uint16_t hidUsage,
+    bool pressed
+);
+
 PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseResetKeyboard(void);
+PT_UNITY_INPUT_INTERNAL bool PTUnityKeyboardReleaseCorrectionTryInitialize(void);
+PT_UNITY_INPUT_INTERNAL bool PTUnityKeyboardReleaseCorrectionDrain(uint8_t backendPressedMask);
+PT_UNITY_INPUT_INTERNAL bool PTUnityKeyboardReleaseCorrectionObserveHidUsage(uint16_t hidUsage, bool pressed);
+
+typedef enum {
+    PTUnityKeyboardOwnerPassthrough = 0,
+    PTUnityKeyboardOwnerConsumed = 1,
+    PTUnityKeyboardOwnerFailed = 2,
+} PTUnityKeyboardOwnerResult;
+
+/// Synchronously owns one mapped gameplay-key edge. The call performs a fresh
+/// Keyboard/front-buffer read-modify-write through Unity UpdateState and a
+/// readback check; it never queues or defers an event. F1-F12 and unsupported
+/// HID usages return Passthrough so their existing routes remain authoritative.
+PT_UNITY_INPUT_INTERNAL bool PTUnityKeyboardOwnerTryInitialize(void);
+PT_UNITY_INPUT_INTERNAL PTUnityKeyboardOwnerResult PTUnityKeyboardOwnerHandleHidUsage(
+    uint16_t hidUsage,
+    bool pressed
+);
+PT_UNITY_INPUT_INTERNAL void PTUnityKeyboardOwnerReset(void);
+PT_UNITY_INPUT_INTERNAL void PTUnityKeyboardReleaseCorrectionSetApplicationActive(bool active);
+PT_UNITY_INPUT_INTERNAL void PTUnityKeyboardReleaseCorrectionSetCommandHeld(bool held);
+PT_UNITY_INPUT_INTERNAL void PTUnityKeyboardReleaseCorrectionReset(uint32_t reason);
+PT_UNITY_INPUT_INTERNAL PTUnityNativeMouseStatus PTUnityKeyboardReleaseCorrectionGetStatus(void);
+
+typedef struct {
+    uint64_t sequence;
+    uint64_t hookCalls;
+    uint64_t hostWDown;
+    uint64_t hostWUp;
+    uint64_t releaseChecks;
+    uint64_t correctionWrites;
+    uint64_t drainCalls;
+    int32_t hookInstallResult;
+    uint32_t lastUpdateType;
+    uint8_t lastWBefore;
+    uint8_t lastWAfter;
+} PTUnityNativeMouseReleaseTrace;
+
+PT_UNITY_INPUT_INTERNAL bool PTUnityNativeMouseGetReleaseTrace(
+    PTUnityNativeMouseReleaseTrace *trace
+);
 
 PT_UNITY_INPUT_INTERNAL PTUnityNativeMouseStatus PTUnityNativeMouseGetLastStatus(void);
 PT_UNITY_INPUT_INTERNAL const char *PTUnityNativeMouseGetSelectedProfileIdentifier(void);

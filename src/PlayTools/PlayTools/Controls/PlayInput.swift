@@ -14,6 +14,7 @@ class PlayInput {
     @objc func drainMainDispatchQueue() {
         PTUnityNativeMouseInput.shared.tick()
         _dispatch_main_queue_callback_4CF(nil)
+        PTUnityNativeMouseInput.shared.afterMainQueueDrain()
     }
 
     func initialize() {

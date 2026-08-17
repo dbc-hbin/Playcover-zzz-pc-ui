@@ -37,9 +37,18 @@ and local `StandaloneInputModule.mousePresent` gate patches.
 
 ## Validation boundary
 
-The bridge publishes complete `MOUS` and `KEYS` state snapshots through Unity's
-Input System. It intentionally does not mutate `InputDevice` flags: runtime
+The bridge publishes complete `MOUS` snapshots and one-byte `DLTA` events for
+F1-F12 through Unity's Input System. It intentionally does not mutate
+`InputDevice` flags: runtime
 evidence showed that native-bit promotion did not repair city clicks or DTEXT.
+The bridge resolves Unity's existing `Keyboard.current` and queues only USB HID
+usages 58 through 69 (F1-F12) to that device. It never adds a second Keyboard,
+which would replace `Keyboard.current`. Ordinary keys remain exclusively on the
+existing physical UIKit/GameController path to avoid duplicate movement state.
+The opt-in `PLAYTOOLS_KEYBOARD_OWNER` build is narrower: it synchronously owns
+only A/D/S/W, Q/E, Space, and Left Shift after an `UpdateState` readback. All
+menu, interaction, text-input, Option, Command, and lock keys stay on the
+original path.
 Runtime verification must use one clean process at a time and confirm startup,
 camera and keyboard regression safety, and city UI clicks before expanding the
 profile registry.
