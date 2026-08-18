@@ -7,6 +7,7 @@ _work/artifacts/*.patched
 _work/ghidra_proj/
 _work/pristine-baseline/
 _work/static-wide/__pycache__/
+_work/experimental-artifacts/
 __pycache__/
 *.pyc
 

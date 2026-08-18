@@ -1152,16 +1152,28 @@ bool PTUnityNativeMouseQueueKeyboardHidUsage(uint16_t hidUsage, bool pressed) {
         case 83:  /* NumLock */
         case 101: /* ContextMenu */
         case 224: /* LeftControl */
+#if !defined(PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT)
         case 226: /* LeftOption */
+#endif
         case 227: /* LeftCommand */
         case 228: /* RightControl */
         case 229: /* RightShift */
+#if !defined(PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT)
         case 230: /* RightOption */
+#endif
         case 231: /* RightCommand */
             return PTReport(PTUnityNativeMouseStatusUnsupportedKeyboardKey);
         default:
             break;
     }
+#if defined(PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT)
+    if (hidUsage == 226 || hidUsage == 230) {
+        os_log_debug(
+            OS_LOG_DEFAULT,
+            "[PlayTools][OptionUILatch] option-queue=enabled"
+        );
+    }
+#endif
     const int32_t key = PTUnityKeyForHidUsage(hidUsage);
     if (key < 0 || key >= kKeyboardStateBytes * 8) {
         return PTReport(PTUnityNativeMouseStatusUnsupportedKeyboardKey);

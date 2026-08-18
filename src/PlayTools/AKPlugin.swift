@@ -97,6 +97,10 @@ class AKPlugin: NSObject, Plugin {
     }
 
     var cmdPressed: Bool = false
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+    private var optionPressed = false
+    private var optionToggleOwned = false
+#endif
     var cursorHideLevel = 0
     func hideCursor() {
         NSCursor.hide()
@@ -144,6 +148,19 @@ class AKPlugin: NSObject, Plugin {
     // swiftlint:disable:next function_body_length
     func setupKeyboard(keyboard: @escaping (UInt16, Bool, Bool, Bool) -> Bool,
                        swapMode: @escaping (UInt16) -> Bool) {
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+        NSLog(
+            "[AKInterface][OptionUILatch] flags-changed-routing=enabled"
+        )
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.optionPressed = false
+            self?.optionToggleOwned = false
+        }
+#endif
         func checkCmd(modifier: NSEvent.ModifierFlags) -> Bool {
             if modifier.contains(.command) {
                 self.cmdPressed = true
@@ -176,6 +193,28 @@ class AKPlugin: NSObject, Plugin {
             return event
         })
         NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { event in
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            // Option is one logical UI-mode switch. Toggle only on the first
+            // aggregate press so pressing both sides cannot toggle twice.
+            // Both physical Option edges are consumed; the native input
+            // owner holds a synthetic Unity Option for the complete UI mode.
+            if event.keyCode == 58 || event.keyCode == 61 {
+                let wasOptionPressed = self.optionPressed
+                let currentFlags = event.modifierFlags
+                self.modifierFlag = currentFlags.rawValue
+                self.optionPressed = currentFlags.contains(.option)
+                if !wasOptionPressed && self.optionPressed {
+                    self.optionToggleOwned = swapMode(event.keyCode)
+                    return self.optionToggleOwned ? nil : event
+                }
+                if !self.optionPressed {
+                    let consumed = self.optionToggleOwned
+                    self.optionToggleOwned = false
+                    return consumed ? nil : event
+                }
+                return self.optionToggleOwned ? nil : event
+            }
+#endif
             if checkCmd(modifier: event.modifierFlags) {
                 return event
             }
@@ -192,12 +231,14 @@ class AKPlugin: NSObject, Plugin {
             // simultaneous modifier changes.
             guard changedFlags.contains(eventFlag) else { return event }
             let pressed = currentFlags.contains(eventFlag)
+#if !PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
             if pressed && eventFlag == .option {
                 if swapMode(event.keyCode) {
                     return nil
                 }
                 return event
             }
+#endif
             let consumed = keyboard(event.keyCode, pressed, false,
                                     event.modifierFlags.contains(.control))
             if consumed {

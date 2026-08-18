@@ -103,6 +103,13 @@ final class PTUnityNativeMouseInput {
     private var lastLoggedStatus: UInt32?
     private var serialOwnedUsages = Set<Int>()
     private var serialPassthroughHeldUsages = Set<Int>()
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+    private let optionUiLatchUsage = 226
+    private let optionUiActivationDelay = 0.080
+    private var optionUiLatchOwned = false
+    private var optionUiLatchReleasePending = false
+    private var optionUiActivationDeadline: TimeInterval?
+#endif
     private init() {}
 
     @discardableResult
@@ -134,6 +141,11 @@ final class PTUnityNativeMouseInput {
             queue: .main
         ) { [weak self] _ in
             self?.restoreCursorCaptureIfNeeded()
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            if self?.cursorCaptured == false {
+                self?.scheduleOptionUiActivation()
+            }
+#endif
         }
         let center = NotificationCenter.default
         for name in [
@@ -160,6 +172,9 @@ final class PTUnityNativeMouseInput {
         PTKeyboardLatencyTrace.shared.tick(phase: "PRE_DRAIN")
 #endif
         _ = PTUnityNativeMouseTryInitialize()
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+        serviceOptionUiLatch()
+#endif
         if PlaySettings.shared.keymapping {
             suspendForKeymappingIfNeeded()
             return
@@ -247,8 +262,12 @@ final class PTUnityNativeMouseInput {
                 ) ?? false
             },
             swapMode: { [weak self] _ in
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+                return self?.toggleCursorCapture() ?? false
+#else
                 _ = self?.toggleCursorCapture()
                 return false
+#endif
             }
         )
         if let profileIdentifier = PTUnityNativeMouseGetSelectedProfileIdentifier() {
@@ -257,6 +276,17 @@ final class PTUnityNativeMouseInput {
                 String(cString: profileIdentifier)
             )
         }
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+        NSLog(
+            "[PlayTools][OptionUILatch] mode=option-toggle-ui-latch"
+        )
+        NSLog(
+            "[PlayTools][OptionUILatch] activation-delay-ms=80"
+        )
+        if !cursorCaptured {
+            scheduleOptionUiActivation()
+        }
+#endif
 #if PLAYTOOLS_W_TRACE
         PTKeyboardLatencyTrace.shared.started()
 #endif
@@ -309,8 +339,9 @@ final class PTUnityNativeMouseInput {
 #endif
         guard canQueueInput else { return false }
         _ = PTUnityNativeMouseObserveKeyboardHidUsage(UInt16(rawUsage), pressed)
-        if isTextInputActive || passthroughHidUsages.contains(rawUsage) ||
-            rawUsage > 111 && rawUsage != 225 { return false }
+        if isTextInputActive ||
+            passthroughHidUsages.contains(rawUsage) ||
+            (rawUsage > 111 && rawUsage != 225) { return false }
         if isRepeat { return serialOwnedUsages.contains(rawUsage) }
         if pressed {
             if serialOwnedUsages.contains(rawUsage) { return true }
@@ -352,6 +383,9 @@ final class PTUnityNativeMouseInput {
     private func suspendForKeymappingIfNeeded() {
         guard !suspendedForKeymapping else { return }
         suspendedForKeymapping = true
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+        requestOptionUiLatchRelease()
+#endif
         resetSerialKeyboardOwnership()
         buttons = 0
         pendingDelta = .zero
@@ -359,9 +393,15 @@ final class PTUnityNativeMouseInput {
         cursorCaptured = false
         if monitorsInstalled {
             queueState(scrollX: 0, scrollY: 0)
-            if !PTUnityNativeMouseResetKeyboard() {
+            let keyboardReset = PTUnityNativeMouseResetKeyboard()
+            if !keyboardReset {
                 logStatusChangeIfNeeded()
             }
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            if keyboardReset {
+                resetOptionUiLatchState()
+            }
+#endif
         }
         releaseCursorCapture()
     }
@@ -376,11 +416,12 @@ final class PTUnityNativeMouseInput {
         lastMotionSentAt = now
     }
 
-    private func queueState(scrollX: CGFloat, scrollY: CGFloat) {
+    @discardableResult
+    private func queueState(scrollX: CGFloat, scrollY: CGFloat) -> Bool {
         let delta = pendingDelta
         pendingDelta = .zero
         positionDirty = false
-        if !PTUnityNativeMouseQueueState(
+        let queued = PTUnityNativeMouseQueueState(
             Float(position.x),
             Float(position.y),
             Float(delta.dx),
@@ -389,9 +430,11 @@ final class PTUnityNativeMouseInput {
             Float(scrollY),
             buttons,
             0
-        ) {
+        )
+        if !queued {
             logStatusChangeIfNeeded()
         }
+        return queued
     }
 
     /// Converts the AppKit window point to the Unity display's logical,
@@ -420,16 +463,29 @@ final class PTUnityNativeMouseInput {
         guard canQueueInput else { return false }
         cursorCaptured.toggle()
         if cursorCaptured {
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            optionUiActivationDeadline = nil
+            requestOptionUiLatchRelease()
+#endif
             restoreCursorCaptureIfNeeded()
         } else {
             buttons = 0
             pendingDelta = .zero
             positionDirty = false
             queueState(scrollX: 0, scrollY: 0)
-            if !PTUnityNativeMouseResetKeyboard() {
+            resetSerialKeyboardOwnership()
+            let keyboardReset = PTUnityNativeMouseResetKeyboard()
+            if !keyboardReset {
                 logStatusChangeIfNeeded()
             }
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            if keyboardReset {
+                resetOptionUiLatchState()
+            }
+            scheduleOptionUiActivation()
+#else
             releaseCursorCapture()
+#endif
         }
         return true
     }
@@ -453,14 +509,23 @@ final class PTUnityNativeMouseInput {
     private func releaseAllButtons() {
         guard started, Thread.isMainThread else { return }
         buttons = 0
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+        requestOptionUiLatchRelease()
+#endif
         resetSerialKeyboardOwnership()
         pendingDelta = .zero
         positionDirty = false
         if monitorsInstalled {
             queueState(scrollX: 0, scrollY: 0)
-            if !PTUnityNativeMouseResetKeyboard() {
+            let keyboardReset = PTUnityNativeMouseResetKeyboard()
+            if !keyboardReset {
                 logStatusChangeIfNeeded()
             }
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+            if keyboardReset {
+                resetOptionUiLatchState()
+            }
+#endif
         }
     }
 
@@ -471,6 +536,73 @@ final class PTUnityNativeMouseInput {
         serialOwnedUsages.removeAll()
         serialPassthroughHeldUsages.removeAll()
     }
+
+#if PLAYTOOLS_OPTION_UI_LATCH_EXPERIMENT
+    private func scheduleOptionUiActivation() {
+        guard !cursorCaptured else { return }
+        holdCursorForOptionUiActivation()
+        if beginOptionUiLatch() {
+            optionUiActivationDeadline =
+                ProcessInfo.processInfo.systemUptime + optionUiActivationDelay
+        } else {
+            optionUiActivationDeadline = nil
+            releaseCursorCapture()
+        }
+    }
+
+    private func holdCursorForOptionUiActivation() {
+        guard !cursorHiddenByBridge, let inputPlugin = AKInterface.shared else { return }
+        inputPlugin.hideCursor()
+        cursorHiddenByBridge = true
+    }
+
+    private func beginOptionUiLatch() -> Bool {
+        if optionUiLatchOwned {
+            optionUiLatchReleasePending = false
+            return true
+        }
+        guard PTUnityNativeMouseQueueKeyboardHidUsage(
+            UInt16(optionUiLatchUsage), true
+        ) else {
+            logStatusChangeIfNeeded()
+            return false
+        }
+        optionUiLatchOwned = true
+        optionUiLatchReleasePending = false
+        return true
+    }
+
+    private func requestOptionUiLatchRelease() {
+        optionUiActivationDeadline = nil
+        guard optionUiLatchOwned else { return }
+        if PTUnityNativeMouseQueueKeyboardHidUsage(
+            UInt16(optionUiLatchUsage), false
+        ) {
+            optionUiLatchOwned = false
+            optionUiLatchReleasePending = false
+        } else {
+            optionUiLatchReleasePending = true
+            logStatusChangeIfNeeded()
+        }
+    }
+
+    private func serviceOptionUiLatch() {
+        if optionUiLatchReleasePending, canQueueInput {
+            requestOptionUiLatchRelease()
+        }
+        guard let deadline = optionUiActivationDeadline,
+              ProcessInfo.processInfo.systemUptime >= deadline else { return }
+        optionUiActivationDeadline = nil
+        guard !cursorCaptured, optionUiLatchOwned else { return }
+        releaseCursorCapture()
+    }
+
+    private func resetOptionUiLatchState() {
+        optionUiLatchOwned = false
+        optionUiLatchReleasePending = false
+        optionUiActivationDeadline = nil
+    }
+#endif
 
     private func logStatusChangeIfNeeded() {
         let status = PTUnityNativeMouseGetLastStatus()
