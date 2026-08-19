@@ -17,6 +17,7 @@ Zenless Zone Zero Global 3.1.0을 Apple Silicon Mac에서 **PC UI, 네이티브 
 - 게임 UI가 모바일 레이아웃 대신 PC 레이아웃을 사용합니다.
 - 마우스로 카메라 회전, 커서 이동, 스크롤과 5개 버튼을 사용할 수 있습니다.
 - Option 키를 눌러 카메라 조작과 보이는 커서를 전환합니다.
+- 검증된 Option 단일 통합 빌드는 커서를 표시하기 전에 80ms 기다린 뒤 UI 모드 동안 Unity의 Option 상태를 유지합니다. Option을 다시 누르면 유지 상태를 해제하고 카메라 조작으로 돌아갑니다.
 - 키보드 입력을 Unity의 기존 키보드 장치 한 개로 순서대로 전달합니다.
 - F1–F12도 일반 키와 같은 경로를 사용합니다.
 - Option, Command, Control, Right Shift와 잠금·시스템 키는 macOS에 그대로 맡깁니다.
@@ -204,6 +205,14 @@ PrintScreen, Pause, ContextMenu
 media/system/unknown HID
 all keys while a text editor is active
 ```
+
+실사용으로 검증된 Option 단일 통합 변형은 현재 배포 아카이브의 재현성을 유지하기 위해 별도로 빌드합니다.
+
+```bash
+zsh tools/build_playtools_command_serialization_experimental.sh
+```
+
+산출물은 `_work/experimental-artifacts/PlayTools-OptionUILatch-experimental.framework.zip`입니다.
 
 ## UnityFramework 정확한 패치
 

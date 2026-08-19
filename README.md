@@ -17,6 +17,7 @@ The first half of this README is a user-friendly installation guide. Exact bytes
 - The game uses its PC UI layout instead of the mobile layout.
 - The native mouse controls the camera, visible cursor, wheel, and five buttons.
 - **Option switches between camera control and the visible cursor.**
+- The validated Option-unified build waits 80 ms before showing the cursor, then keeps Unity's Option state latched while UI mode is active. Press Option again to release the latch and return to camera control.
 - Keyboard events are delivered in order to Unity's one existing keyboard device.
 - F1–F12 use the same serial path as ordinary keys.
 - Option, Command, Control, Right Shift, lock keys, and system keys stay with macOS.
@@ -207,6 +208,14 @@ all keys while a text editor is active
 ```
 
 Option remains outside serialization because it switches between camera control and the visible cursor.
+
+The runtime-validated Option-unified variant is built separately so the current release archives remain reproducible:
+
+```bash
+zsh tools/build_playtools_command_serialization_experimental.sh
+```
+
+Its output is `_work/experimental-artifacts/PlayTools-OptionUILatch-experimental.framework.zip`.
 
 ## Exact UnityFramework patch
 
